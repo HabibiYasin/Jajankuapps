@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 import 'top_categories_widget.dart';
+import '../services/export_service.dart'; // <-- Import layanan ekspor
 
 class DashboardScreen extends StatefulWidget {
   final List<TransactionModel> history;
@@ -128,8 +129,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(height: 190, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, crossAxisAlignment: CrossAxisAlignment.end, children: _buildChartBars())),
           const SizedBox(height: 24),
           
-          // ---> WIDGET TOP 3 KATEGORI DISISIPKAN DI SINI <---
           TopCategoriesWidget(history: widget.history),
+          const SizedBox(height: 24),
+
+          // ---> TOMBOL EXPORT KE CSV / SHEET <---
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.download),
+              label: const Text('Export Laporan ke CSV / Sheet'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                await ExportService.exportTransactionsToCSV(widget.history);
+              },
+            ),
+          ),
           const SizedBox(height: 24),
 
           const Text('Riwayat Transaksi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

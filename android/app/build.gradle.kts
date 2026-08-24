@@ -40,15 +40,3 @@ kotlin {
 flutter {
     source = "../.."
 }
-subprojects {
-    afterEvaluate {
-        project.android {
-            if (namespace != null) {
-                compileSdk = 36
-                defaultConfig {
-                    minSdk = flutter.minSdkVersion
-                }
-            }
-        }
-    }
-}

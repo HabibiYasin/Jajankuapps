@@ -35,6 +35,8 @@ dependencies:
   google_mlkit_text_recognition: ^0.14.0
   sqflite: ^2.3.0
   path: ^1.8.3
+  path_provider: ^2.1.2  # <-- Tambahkan ini untuk akses direktori lokal
+  share_plus: ^10.1.2     # <-- Tambahkan ini untuk fitur export/share file
 
 dev_dependencies:
   flutter_test:
