@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
+import 'top_categories_widget.dart';
 
 class DashboardScreen extends StatefulWidget {
   final List<TransactionModel> history;
@@ -126,6 +127,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 12),
           Container(height: 190, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, crossAxisAlignment: CrossAxisAlignment.end, children: _buildChartBars())),
           const SizedBox(height: 24),
+          
+          // ---> WIDGET TOP 3 KATEGORI DISISIPKAN DI SINI <---
+          TopCategoriesWidget(history: widget.history),
+          const SizedBox(height: 24),
+
           const Text('Riwayat Transaksi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
           widget.history.isEmpty
