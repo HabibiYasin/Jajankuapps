@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
-// Mengimpor file model, service, dan screens yang sudah kita pecah
 import 'models/transaction_model.dart';
 import 'services/ocr_service.dart';
+import 'services/database_helper.dart'; // Import Database Helper
 import 'screens/dashboard_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/settings_screen.dart';
@@ -20,7 +20,6 @@ class QrisTrackerApp extends StatefulWidget {
 class _QrisTrackerAppState extends State<QrisTrackerApp> {
   int _selectedIndex = 0;
 
-  // Global State
   final String _userName = "Habibi Yasin";
   final String _userRole = "QA Engineer";
   final double _dailyBudgetLimit = 50000.0;
@@ -28,8 +27,24 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
   final double _monthlyBudgetLimit = 1500000.0;
 
   File? _imageFile;
-  final List<TransactionModel> _transactionHistory = [];
+  List<TransactionModel> _transactionHistory = [];
   final _picker = ImagePicker();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactionsFromDB(); // Muat data dari SQLite saat aplikasi dibuka
+  }
+
+  // Ambil data dari database lokal
+  Future<void> _loadTransactionsFromDB() async {
+    final data = await DatabaseHelper.instance.fetchTransactions();
+    setState(() {
+      _transactionHistory = data;
+      _isLoading = false;
+    });
+  }
 
   Future<void> _processImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -37,11 +52,18 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
 
     try {
       final tx = await OcrService.processImage(File(pickedFile.path));
+      
+      // Simpan ke SQLite Database
+      await DatabaseHelper.instance.insertTransaction(tx);
+      
+      // Refresh list dari database
+      await _loadTransactionsFromDB();
+
       setState(() {
         _imageFile = File(pickedFile.path);
-        _transactionHistory.insert(0, tx);
-        _selectedIndex = 0; 
+        _selectedIndex = 0; // Lompat ke Dashboard
       });
+      
       _checkDailyBudget();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
@@ -52,7 +74,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     double totalToday = 0;
     DateTime now = DateTime.now();
     for (var tx in _transactionHistory) {
-      if (tx.dateTime.year == now.year && tx.dateTime.month == now.month && tx.dateTime.day == now.day) totalToday += tx.numericNominal;
+      if (tx.dateTime.year == now.year && tx.dateTime.month == now.month && tx.dateTime.day == now.day) {
+        totalToday += tx.numericNominal;
+      }
     }
     if (totalToday > _dailyBudgetLimit) {
       showDialog(
@@ -68,18 +92,32 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: Colors.teal)),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('QRIS Expense Tracker'), elevation: 0, backgroundColor: Colors.teal, foregroundColor: Colors.white),
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          // Panggil Widget Eksternal dan oper data (State Lifting)
           DashboardScreen(
             history: _transactionHistory,
             dailyLimit: _dailyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
-            onDelete: (index) => setState(() => _transactionHistory.removeAt(index)),
-            onUpdateDate: (index, newDate) => setState(() => _transactionHistory[index].dateTime = newDate),
+            onDelete: (index) async {
+              // Hapus dari Database
+              await DatabaseHelper.instance.deleteTransaction(_transactionHistory[index]);
+              await _loadTransactionsFromDB();
+            },
+            onUpdateDate: (index, newDate) async {
+              // Update Tanggal di Database
+              final tx = _transactionHistory[index];
+              await DatabaseHelper.instance.updateTransactionDate(tx, newDate);
+              await _loadTransactionsFromDB();
+            },
           ),
           ScannerScreen(
             onProcessImage: _processImage,
