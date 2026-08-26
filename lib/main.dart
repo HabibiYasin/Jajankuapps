@@ -1,10 +1,12 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart'; // <-- Import package share intent
 
 import 'models/transaction_model.dart';
 import 'services/ocr_service.dart';
-import 'services/database_helper.dart'; // Import Database Helper
+import 'services/database_helper.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/settings_screen.dart';
@@ -31,10 +33,39 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
   final _picker = ImagePicker();
   bool _isLoading = true;
 
+  // Stream subscription untuk menangkap intent share dari luar
+  late StreamSubscription _intentDataStreamSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadTransactionsFromDB(); // Muat data dari SQLite saat aplikasi dibuka
+
+    // 1. Mendengarkan intent saat aplikasi berjalan di background/paused dan menerima file share baru
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((value) {
+      if (value.isNotEmpty) {
+        String sharedPath = value.first.path;
+        _processSharedImageFile(File(sharedPath));
+      }
+    }, onError: (err) {
+      debugPrint("Error get shared media stream: $err");
+    });
+
+    // 2. Mendengarkan intent saat aplikasi baru dibuka dari kondisi tertutup (cold start) melalui share file
+    ReceiveSharingIntent.instance.getInitialMedia().then((value) {
+      if (value.isNotEmpty) {
+        String sharedPath = value.first.path;
+        _processSharedImageFile(File(sharedPath));
+      }
+      // Reset intent setelah diproses agar tidak terpanggil berulang kali
+      ReceiveSharingIntent.instance.reset();
+    });
+  }
+
+  @override
+  void dispose() {
+    _intentDataStreamSubscription.cancel();
+    super.dispose();
   }
 
   // Ambil data dari database lokal
@@ -46,12 +77,14 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     });
   }
 
-  Future<void> _processImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile == null) return;
-
+  // Fungsi khusus untuk memproses file gambar yang dikirim dari luar (share intent)
+  Future<void> _processSharedImageFile(File imageFile) async {
     try {
-      final tx = await OcrService.processImage(File(pickedFile.path));
+      setState(() {
+        _isLoading = true;
+      });
+
+      final tx = await OcrService.processImage(imageFile);
       
       // Simpan ke SQLite Database
       await DatabaseHelper.instance.insertTransaction(tx);
@@ -60,14 +93,27 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       await _loadTransactionsFromDB();
 
       setState(() {
-        _imageFile = File(pickedFile.path);
-        _selectedIndex = 0; // Lompat ke Dashboard
+        _imageFile = imageFile;
+        _selectedIndex = 0; // Otomatis pindah ke Dashboard
+        _isLoading = false;
       });
       
       _checkDailyBudget();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses share file: $e")));
+      }
     }
+  }
+
+  // Fungsi proses gambar manual dari tombol di ScannerScreen (Galeri)
+  Future<void> _processImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile == null) return;
+    await _processSharedImageFile(File(pickedFile.path));
   }
 
   void _checkDailyBudget() {
@@ -108,12 +154,10 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
             dailyLimit: _dailyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
             onDelete: (index) async {
-              // Hapus dari Database
               await DatabaseHelper.instance.deleteTransaction(_transactionHistory[index]);
               await _loadTransactionsFromDB();
             },
             onUpdateDate: (index, newDate) async {
-              // Update Tanggal di Database
               final tx = _transactionHistory[index];
               await DatabaseHelper.instance.updateTransactionDate(tx, newDate);
               await _loadTransactionsFromDB();

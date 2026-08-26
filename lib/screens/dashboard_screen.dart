@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 import 'top_categories_widget.dart';
-import '../services/export_service.dart'; // <-- Import layanan ekspor
+import '../services/export_service.dart'; // <-- Import layanan ekspor[cite: 3]
 
 class DashboardScreen extends StatefulWidget {
   final List<TransactionModel> history;
@@ -19,6 +19,10 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  // Variabel State untuk Pencarian & Filter Kategori
+  String _searchQuery = "";
+  String _selectedCategory = "Semua";
+
   double _calculateTodayTotal() {
     double total = 0; DateTime now = DateTime.now();
     for (var tx in widget.history) { if (tx.dateTime.year == now.year && tx.dateTime.month == now.month && tx.dateTime.day == now.day) total += tx.numericNominal; }
@@ -112,6 +116,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     double currentDaily = _calculateTodayTotal(); double currentMonthly = _calculateMonthlyTotal();
+
+    // Logika Filter & Pencarian Transaksi
+    List<TransactionModel> filteredHistory = widget.history.where((tx) {
+      bool matchesSearch = tx.merchant.toLowerCase().contains(_searchQuery.toLowerCase());
+      bool matchesCategory = _selectedCategory == "Semua" || tx.category == _selectedCategory;
+      return matchesSearch && matchesCategory;
+    }).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -132,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           TopCategoriesWidget(history: widget.history),
           const SizedBox(height: 24),
 
-          // ---> TOMBOL EXPORT KE CSV / SHEET <---
+          // Tombol Export ke CSV / Sheet[cite: 3]
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -153,13 +165,74 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const Text('Riwayat Transaksi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
-          widget.history.isEmpty
-              ? const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Belum ada transaksi', style: TextStyle(color: Colors.grey))))
+
+          // Widget Kotak Pencarian Merchant
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'Cari nama merchant...',
+              prefixIcon: const Icon(Icons.search, color: Colors.teal),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Choice Chips Filter Kategori Horizontal
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ['Semua', 'Makanan', 'Minuman', 'Jajan', 'Belanja', 'Lifestyle'].map((category) {
+                bool isSelected = _selectedCategory == category;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text(category),
+                    selected: isSelected,
+                    selectedColor: Colors.teal,
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+                    backgroundColor: Colors.grey.shade100,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedCategory = category;
+                      });
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Daftar Riwayat Transaksi Berdasarkan Hasil Filter & Pencarian
+          filteredHistory.isEmpty
+              ? const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Tidak ada transaksi yang cocok', style: TextStyle(color: Colors.grey))))
               : ListView.builder(
-                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: widget.history.length,
+                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: filteredHistory.length,
                   itemBuilder: (context, index) {
-                    final tx = widget.history[index];
-                    return Card(margin: const EdgeInsets.only(bottom: 8), child: InkWell(onTap: () => _showTransactionDetailModal(context, index), borderRadius: BorderRadius.circular(12), child: ListTile(leading: CircleAvatar(backgroundColor: Colors.teal[50], child: const Icon(Icons.receipt_long, color: Colors.teal)), title: Text(tx.merchant, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${tx.category} • ${tx.formattedTime}', style: const TextStyle(fontSize: 12)), trailing: Text(tx.nominalStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)))));
+                    final tx = filteredHistory[index];
+                    final originalIndex = widget.history.indexOf(tx); // Memetakan index asli untuk fungsi hapus/edit
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8), 
+                      child: InkWell(
+                        onTap: () => _showTransactionDetailModal(context, originalIndex), 
+                        borderRadius: BorderRadius.circular(12), 
+                        child: ListTile(
+                          leading: CircleAvatar(backgroundColor: Colors.teal[50], child: const Icon(Icons.receipt_long, color: Colors.teal)), 
+                          title: Text(tx.merchant, style: const TextStyle(fontWeight: FontWeight.bold)), 
+                          subtitle: Text('${tx.category} • ${tx.formattedTime}', style: const TextStyle(fontSize: 12)), 
+                          trailing: Text(tx.nominalStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                        ),
+                      ),
+                    );
                   },
                 ),
         ],

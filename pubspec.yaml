@@ -37,6 +37,7 @@ dependencies:
   path: ^1.8.3
   path_provider: ^2.1.2  # <-- Tambahkan ini untuk akses direktori lokal
   share_plus: ^10.1.2     # <-- Tambahkan ini untuk fitur export/share file
+  receive_sharing_intent: ^1.8.1
 
 dev_dependencies:
   flutter_test:
