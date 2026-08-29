@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:receive_sharing_intent/receive_sharing_intent.dart'; // <-- Import package share intent
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; // <-- Diperlukan untuk baca Raw Text
 
 import 'models/transaction_model.dart';
 import 'services/ocr_service.dart';
@@ -32,6 +33,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
   List<TransactionModel> _transactionHistory = [];
   final _picker = ImagePicker();
   bool _isLoading = true;
+
+  // Variabel untuk menampung teks mentah OCR (Debug UI)
+  String _rawDebugText = "";
 
   // Stream subscription untuk menangkap intent share dari luar
   late StreamSubscription _intentDataStreamSubscription;
@@ -77,24 +81,33 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     });
   }
 
-  // Fungsi khusus untuk memproses file gambar yang dikirim dari luar (share intent)
+  // Fungsi khusus untuk memproses file gambar (share intent maupun dari galeri)
   Future<void> _processSharedImageFile(File imageFile) async {
     try {
       setState(() {
         _isLoading = true;
       });
 
+      // 1. Ekstraksi Raw Text secara langsung untuk ditampilkan di Debug UI ScannerScreen
+      final inputImage = InputImage.fromFile(imageFile);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      
+      setState(() {
+        _rawDebugText = recognizedText.text.isNotEmpty ? recognizedText.text : "Tidak ada teks yang terdeteksi.";
+      });
+      
+      await textRecognizer.close();
+
+      // 2. Proses parsing transaksi ke model & SQLite
       final tx = await OcrService.processImage(imageFile);
       
-      // Simpan ke SQLite Database
       await DatabaseHelper.instance.insertTransaction(tx);
-      
-      // Refresh list dari database
       await _loadTransactionsFromDB();
 
       setState(() {
         _imageFile = imageFile;
-        _selectedIndex = 0; // Otomatis pindah ke Dashboard
+        _selectedIndex = 1; // Otomatis pindah ke tab Scanner Screen agar kotak debug langsung terlihat
         _isLoading = false;
       });
       
@@ -102,9 +115,10 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _rawDebugText = "Gagal memproses OCR: $e";
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses share file: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses file: $e")));
       }
     }
   }
@@ -166,6 +180,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
           ScannerScreen(
             onProcessImage: _processImage,
             imageFile: _imageFile,
+            rawTextDebug: _rawDebugText, // Meneruskan data raw text ke UI Scanner
           ),
           SettingsScreen(
             userName: _userName,

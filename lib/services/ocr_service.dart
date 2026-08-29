@@ -93,20 +93,32 @@ class OcrService {
 
   // Helper untuk konversi nama bulan teks ke angka
   static int _parseIndonesianMonth(String monthStr) {
+    // Normalisasi teks: Ubah ke huruf kecil dan koreksi typo OCR umum
+    // - Mengubah 'l' atau '1' menjadi 'i'
+    // - Mengubah 'q' menjadi 'g'
+    // - Mengubah '0' menjadi 'o' (mengantisipasi angka nol tertukar huruf o)
+    String sanitized = monthStr.toLowerCase()
+        .replaceAll('1', 'i')
+        .replaceAll('l', 'i') 
+        .replaceAll('q', 'g')
+        .replaceAll('0', 'o')
+        .replaceAll('5', 's'); // Ubah huruf S jadi angka 5 (jika dalam konteks angka);
+
     const months = {
       'jan': 1, 'januari': 1,
       'feb': 2, 'februari': 2,
       'mar': 3, 'maret': 3,
       'apr': 4, 'april': 4,
-      'mei': 5, 'may': 5,
+      'mei': 5, 'may': 5, 'mel': 5,
       'jun': 6, 'juni': 6,
-      'jul': 7, 'juli': 7,
+      'jul': 7, 'juli': 7, 'jui': 7,
       'agu': 8, 'agust': 8, 'agustus': 8, 'aug': 8, 'ags': 8,
       'sep': 9, 'september': 9,
       'okt': 10, 'oktober': 10, 'oct': 10,
       'nov': 11, 'november': 11,
       'des': 12, 'desember': 12, 'dec': 12,
     };
-    return months[monthStr.substring(0, monthStr.length >= 3 ? 3 : monthStr.length)] ?? 1;
+
+    return months[sanitized] ?? 1; // Default ke Januari (1) jika benar-benar tidak dikenali
   }
 }
