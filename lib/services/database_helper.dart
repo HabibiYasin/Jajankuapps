@@ -16,13 +16,14 @@ class DatabaseHelper {
 
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
-    const int dbVersion = 1; // Mendefinisikan versi database secara eksplisit
+    const int dbVersion = 2; // Naikkan versi ke 2 untuk menambahkan kolom 'source'
     final path = join(dbPath, filePath);
 
     return await openDatabase(
       path, 
       version: dbVersion, 
-      onCreate: _createDB
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB, // Menangani penambahan kolom tanpa merusak data lama
     );
   }
 
@@ -34,9 +35,16 @@ class DatabaseHelper {
         nominalStr TEXT,
         dateTime TEXT,
         category TEXT,
+        source TEXT,
         numericNominal REAL
       )
     ''');
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'QRIS Umum'");
+    }
   }
 
   // CREATE: Simpan Transaksi Baru
@@ -47,6 +55,7 @@ class DatabaseHelper {
       'nominalStr': tx.nominalStr,
       'dateTime': tx.dateTime.toIso8601String(),
       'category': tx.category,
+      'source': tx.source,
       'numericNominal': tx.numericNominal,
     });
   }
@@ -57,23 +66,39 @@ class DatabaseHelper {
     final result = await db.query('transactions', orderBy: 'dateTime DESC');
 
     return result.map((json) => TransactionModel(
+      id: json['id'] as int?,
       merchant: json['merchant'] as String,
       nominalStr: json['nominalStr'] as String,
       dateTime: DateTime.parse(json['dateTime'] as String),
       category: json['category'] as String,
+      source: (json['source'] as String?) ?? 'QRIS Umum',
       numericNominal: json['numericNominal'] as double,
     )).toList();
   }
 
-  // UPDATE: Ubah Tanggal Transaksi Berdasarkan ID / Index
+  // UPDATE: Ubah Tanggal Transaksi 
   Future<int> updateTransactionDate(TransactionModel tx, DateTime newDate) async {
     final db = await instance.database;
-    // Untuk simplifikasi MVP, kita update berdasarkan kesamaan merchant & timestamp lama
     return await db.update(
       'transactions',
       {'dateTime': newDate.toIso8601String()},
-      where: 'merchant = ? AND nominalStr = ?',
-      whereArgs: [tx.merchant, tx.nominalStr],
+      where: 'id = ?',
+      whereArgs: [tx.id],
+    );
+  }
+
+  // UPDATE FULL: Ubah Merchant, Source, Category dari form Edit
+  Future<int> updateTransactionFull(TransactionModel tx) async {
+    final db = await instance.database;
+    return await db.update(
+      'transactions',
+      {
+        'merchant': tx.merchant,
+        'category': tx.category,
+        'source': tx.source, 
+      },
+      where: 'id = ?',
+      whereArgs: [tx.id],
     );
   }
 
@@ -82,8 +107,8 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.delete(
       'transactions',
-      where: 'merchant = ? AND nominalStr = ? AND dateTime = ?',
-      whereArgs: [tx.merchant, tx.nominalStr, tx.dateTime.toIso8601String()],
+      where: 'id = ?',
+      whereArgs: [tx.id],
     );
   }
 }

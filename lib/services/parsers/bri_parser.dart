@@ -69,6 +69,7 @@ class BriParser {
       dateTime: DateTime.now(),
       category: category,
       numericNominal: numericVal,
+      source: "BRImo", 
     );
   }
 }

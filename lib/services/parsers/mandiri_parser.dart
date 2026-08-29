@@ -102,6 +102,7 @@ class MandiriParser {
       dateTime: DateTime.now(),
       category: category,
       numericNominal: numericVal,
+      source: "Livin' by Mandiri", 
     );
   }
 }

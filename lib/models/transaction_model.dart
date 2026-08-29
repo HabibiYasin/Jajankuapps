@@ -1,15 +1,19 @@
 class TransactionModel {
+  int? id; // Tambahkan ID untuk referensi ke database
   String merchant;
   String nominalStr;
   DateTime dateTime;
   String category;
+  String source; // Menampung asal aplikasi QRIS (ShopeePay, DANA, dll)
   double numericNominal;
 
   TransactionModel({
+    this.id,
     required this.merchant,
     required this.nominalStr,
     required this.dateTime,
     required this.category,
+    this.source = "QRIS Umum", // Nilai default
     required this.numericNominal,
   });
 

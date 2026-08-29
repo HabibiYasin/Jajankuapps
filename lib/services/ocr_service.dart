@@ -26,6 +26,7 @@ class OcrService {
         nominalStr: transaction.nominalStr,
         numericNominal: transaction.numericNominal,
         dateTime: receiptDateTime, // Menggunakan waktu dari screenshot
+        source: transaction.source,
       );
     } catch (e) {
       textRecognizer.close();

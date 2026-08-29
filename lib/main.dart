@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; // <-- Diperlukan untuk baca Raw Text
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'models/transaction_model.dart';
 import 'services/ocr_service.dart';
@@ -34,18 +34,15 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
   final _picker = ImagePicker();
   bool _isLoading = true;
 
-  // Variabel untuk menampung teks mentah OCR (Debug UI)
   String _rawDebugText = "";
 
-  // Stream subscription untuk menangkap intent share dari luar
   late StreamSubscription _intentDataStreamSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadTransactionsFromDB(); // Muat data dari SQLite saat aplikasi dibuka
+    _loadTransactionsFromDB(); 
 
-    // 1. Mendengarkan intent saat aplikasi berjalan di background/paused dan menerima file share baru
     _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((value) {
       if (value.isNotEmpty) {
         String sharedPath = value.first.path;
@@ -55,13 +52,11 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       debugPrint("Error get shared media stream: $err");
     });
 
-    // 2. Mendengarkan intent saat aplikasi baru dibuka dari kondisi tertutup (cold start) melalui share file
     ReceiveSharingIntent.instance.getInitialMedia().then((value) {
       if (value.isNotEmpty) {
         String sharedPath = value.first.path;
         _processSharedImageFile(File(sharedPath));
       }
-      // Reset intent setelah diproses agar tidak terpanggil berulang kali
       ReceiveSharingIntent.instance.reset();
     });
   }
@@ -72,7 +67,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     super.dispose();
   }
 
-  // Ambil data dari database lokal
   Future<void> _loadTransactionsFromDB() async {
     final data = await DatabaseHelper.instance.fetchTransactions();
     setState(() {
@@ -81,14 +75,12 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     });
   }
 
-  // Fungsi khusus untuk memproses file gambar (share intent maupun dari galeri)
   Future<void> _processSharedImageFile(File imageFile) async {
     try {
       setState(() {
         _isLoading = true;
       });
 
-      // 1. Ekstraksi Raw Text secara langsung untuk ditampilkan di Debug UI ScannerScreen
       final inputImage = InputImage.fromFile(imageFile);
       final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
@@ -99,7 +91,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       
       await textRecognizer.close();
 
-      // 2. Proses parsing transaksi ke model & SQLite
       final tx = await OcrService.processImage(imageFile);
       
       await DatabaseHelper.instance.insertTransaction(tx);
@@ -107,7 +98,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
 
       setState(() {
         _imageFile = imageFile;
-        _selectedIndex = 1; // Otomatis pindah ke tab Scanner Screen agar kotak debug langsung terlihat
+        _selectedIndex = 1; 
         _isLoading = false;
       });
       
@@ -123,7 +114,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     }
   }
 
-  // Fungsi proses gambar manual dari tombol di ScannerScreen (Galeri)
   Future<void> _processImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile == null) return;
@@ -176,11 +166,16 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
               await DatabaseHelper.instance.updateTransactionDate(tx, newDate);
               await _loadTransactionsFromDB();
             },
+            // Callback pembaruan transaksi yang baru ditambahkan
+            onUpdateTransaction: (updatedTx) async {
+              await DatabaseHelper.instance.updateTransactionFull(updatedTx);
+              await _loadTransactionsFromDB();
+            },
           ),
           ScannerScreen(
             onProcessImage: _processImage,
             imageFile: _imageFile,
-            rawTextDebug: _rawDebugText, // Meneruskan data raw text ke UI Scanner
+            rawTextDebug: _rawDebugText,
           ),
           SettingsScreen(
             userName: _userName,

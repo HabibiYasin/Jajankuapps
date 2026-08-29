@@ -4,6 +4,7 @@ import 'parsers/dana_parser.dart';
 import 'parsers/bca_parser.dart';
 import 'parsers/bca_syariah_parser.dart';
 import 'parsers/bri_parser.dart';
+import 'parsers/gopay_parser.dart';
 import 'parsers/mandiri_parser.dart'; // <-- Import Mandiri Parser
 
 class QrisParser {
@@ -24,6 +25,8 @@ class QrisParser {
       return BriParser.parse(rawText, cleanedLines);
     } else if (MandiriParser.isMatch(rawText)) {
       return MandiriParser.parse(rawText, cleanedLines);
+    } else if (GopayParser.isMatch(rawText)) { // <-- Tambahkan routing GoPay di sini
+      return GopayParser.parse(rawText, cleanedLines);
     }
 
     // Fallback jika belum terdaftar

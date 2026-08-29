@@ -106,6 +106,7 @@ class BcaSyariahParser {
       dateTime: DateTime.now(),
       category: category,
       numericNominal: numericVal,
+      source: "BCA Syariah", 
     );
   }
 }

@@ -66,6 +66,7 @@ class ShopeePayParser {
       dateTime: DateTime.now(),
       category: category,
       numericNominal: numericVal,
+      source: "ShopeePay", 
     );
   }
 }
