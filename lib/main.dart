@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -11,8 +12,16 @@ import 'services/database_helper.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/settings_screen.dart';
+import 'theme/app_theme.dart';
 
-void main() => runApp(const MaterialApp(home: QrisTrackerApp(), debugShowCheckedModeBanner: false));
+void main() => runApp(
+  MaterialApp(
+    title: 'Jajanku',
+    theme: AppTheme.light,
+    home: const QrisTrackerApp(),
+    debugShowCheckedModeBanner: false,
+  ),
+);
 
 class QrisTrackerApp extends StatefulWidget {
   const QrisTrackerApp({super.key});
@@ -41,16 +50,21 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
   @override
   void initState() {
     super.initState();
-    _loadTransactionsFromDB(); 
+    _loadTransactionsFromDB();
 
-    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((value) {
-      if (value.isNotEmpty) {
-        String sharedPath = value.first.path;
-        _processSharedImageFile(File(sharedPath));
-      }
-    }, onError: (err) {
-      debugPrint("Error get shared media stream: $err");
-    });
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance
+        .getMediaStream()
+        .listen(
+          (value) {
+            if (value.isNotEmpty) {
+              String sharedPath = value.first.path;
+              _processSharedImageFile(File(sharedPath));
+            }
+          },
+          onError: (err) {
+            debugPrint("Error get shared media stream: $err");
+          },
+        );
 
     ReceiveSharingIntent.instance.getInitialMedia().then((value) {
       if (value.isNotEmpty) {
@@ -82,29 +96,33 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       });
 
       final inputImage = InputImage.fromFile(imageFile);
-      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      final textRecognizer = TextRecognizer(
+        script: TextRecognitionScript.latin,
+      );
+      final RecognizedText recognizedText = await textRecognizer.processImage(
+        inputImage,
+      );
       final spatialText = OcrService.extractSpatialText(recognizedText);
-      
+
       setState(() {
         _rawDebugText = spatialText.isNotEmpty
             ? spatialText
             : "Tidak ada teks yang terdeteksi.";
       });
-      
+
       await textRecognizer.close();
 
       final tx = await OcrService.processImage(imageFile);
-      
+
       await DatabaseHelper.instance.insertTransaction(tx);
       await _loadTransactionsFromDB();
 
       setState(() {
         _imageFile = imageFile;
-        _selectedIndex = 1; 
+        _selectedIndex = 1;
         _isLoading = false;
       });
-      
+
       _checkDailyBudget();
     } catch (e) {
       setState(() {
@@ -112,7 +130,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
         _rawDebugText = "Gagal memproses OCR: $e";
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses file: $e")));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Gagal memproses file: $e")));
       }
     }
   }
@@ -127,7 +146,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
     double totalToday = 0;
     DateTime now = DateTime.now();
     for (var tx in _transactionHistory) {
-      if (tx.dateTime.year == now.year && tx.dateTime.month == now.month && tx.dateTime.day == now.day) {
+      if (tx.dateTime.year == now.year &&
+          tx.dateTime.month == now.month &&
+          tx.dateTime.day == now.day) {
         totalToday += tx.numericNominal;
       }
     }
@@ -135,9 +156,22 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Row(children: [Icon(Icons.warning, color: Colors.red), SizedBox(width: 8), Text('Budget Habis!')]),
-          content: Text('Pengeluaran harian mencapai Rp${totalToday.toStringAsFixed(0)}.\nBatas: Rp${_dailyBudgetLimit.toStringAsFixed(0)}'),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+          title: const Row(
+            children: [
+              Icon(Icons.warning, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Budget Habis!'),
+            ],
+          ),
+          content: Text(
+            'Pengeluaran harian mencapai Rp${totalToday.toStringAsFixed(0)}.\nBatas: Rp${_dailyBudgetLimit.toStringAsFixed(0)}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
         ),
       );
     }
@@ -146,13 +180,44 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Colors.teal)),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('QRIS Expense Tracker'), elevation: 0, backgroundColor: Colors.teal, foregroundColor: Colors.white),
+      appBar: AppBar(
+        toolbarHeight: 72,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Jajanku',
+              style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              'Catat jajan, lebih tenang',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+            ),
+          ],
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.charcoal, AppColors.teal],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: CircleAvatar(
+              backgroundColor: Colors.white.withValues(alpha: 0.18),
+              child: const Icon(Icons.account_balance_wallet_outlined),
+            ),
+          ),
+        ],
+      ),
       body: IndexedStack(
         index: _selectedIndex,
         children: [
@@ -161,7 +226,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
             dailyLimit: _dailyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
             onDelete: (index) async {
-              await DatabaseHelper.instance.deleteTransaction(_transactionHistory[index]);
+              await DatabaseHelper.instance.deleteTransaction(
+                _transactionHistory[index],
+              );
               await _loadTransactionsFromDB();
             },
             onUpdateDate: (index, newDate) async {
@@ -189,16 +256,51 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        selectedItemColor: Colors.teal,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.document_scanner), label: 'Scan Struk'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Pengaturan'),
-        ],
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.charcoal.withValues(alpha: 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (index) {
+              setState(() => _selectedIndex = index);
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.grid_view_rounded),
+                selectedIcon: Icon(
+                  Icons.grid_view_rounded,
+                  color: AppColors.teal,
+                ),
+                label: 'Dashboard',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.document_scanner_outlined),
+                selectedIcon: Icon(
+                  Icons.document_scanner,
+                  color: AppColors.pink,
+                ),
+                label: 'Scan Struk',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.tune_rounded),
+                selectedIcon: Icon(Icons.tune_rounded, color: AppColors.teal),
+                label: 'Pengaturan',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../models/transaction_model.dart';
+import '../theme/app_theme.dart';
 
 class TopCategoriesWidget extends StatelessWidget {
   final List<TransactionModel> history;
@@ -17,7 +19,8 @@ class TopCategoriesWidget extends StatelessWidget {
     // 2. Agregasi total nominal per kategori
     final Map<String, double> categoryTotals = {};
     for (var tx in currentMonthTransactions) {
-      categoryTotals[tx.category] = (categoryTotals[tx.category] ?? 0.0) + tx.numericNominal;
+      categoryTotals[tx.category] =
+          (categoryTotals[tx.category] ?? 0.0) + tx.numericNominal;
     }
 
     // 3. Urutkan dari yang terbesar
@@ -48,7 +51,11 @@ class TopCategoriesWidget extends StatelessWidget {
       children: [
         const Text(
           'Top 3 Kategori Bulan Ini',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.charcoal,
+          ),
         ),
         const SizedBox(height: 8),
         ...top3.asMap().entries.map((entry) {
@@ -61,9 +68,9 @@ class TopCategoriesWidget extends StatelessWidget {
           if (index == 0) {
             badgeColor = Colors.amber.shade700;
           } else if (index == 1) {
-            badgeColor = Colors.blueGrey;
+            badgeColor = AppColors.teal;
           } else {
-            badgeColor = Colors.brown;
+            badgeColor = AppColors.pink;
           }
 
           return Card(
@@ -72,14 +79,31 @@ class TopCategoriesWidget extends StatelessWidget {
             child: ListTile(
               leading: CircleAvatar(
                 backgroundColor: badgeColor,
-                child: Text('#${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '#${index + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              title: Text(category, style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: Text(
+                category,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               subtitle: Text('Total: Rp${total.toStringAsFixed(0)}'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              trailing: const Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey,
+              ),
               onTap: () {
                 // Saat diklik, tampilkan detail transaksi untuk kategori ini
-                _showCategoryDetail(context, category, currentMonthTransactions);
+                _showCategoryDetail(
+                  context,
+                  category,
+                  currentMonthTransactions,
+                );
               },
             ),
           );
@@ -89,8 +113,14 @@ class TopCategoriesWidget extends StatelessWidget {
   }
 
   // Fungsi untuk menampilkan Popup Detail Transaksi Berdasarkan Kategori yang diklik
-  void _showCategoryDetail(BuildContext context, String category, List<TransactionModel> transactions) {
-    final filtered = transactions.where((tx) => tx.category == category).toList();
+  void _showCategoryDetail(
+    BuildContext context,
+    String category,
+    List<TransactionModel> transactions,
+  ) {
+    final filtered = transactions
+        .where((tx) => tx.category == category)
+        .toList();
 
     showModalBottomSheet(
       context: context,
@@ -106,7 +136,11 @@ class TopCategoriesWidget extends StatelessWidget {
             children: [
               Text(
                 'Detail Kategori: $category',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.teal,
+                ),
               ),
               const Divider(),
               Expanded(
@@ -117,9 +151,20 @@ class TopCategoriesWidget extends StatelessWidget {
                     final tx = filtered[i];
                     return ListTile(
                       dense: true,
-                      title: Text(tx.merchant, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text('${tx.dateTime.day}/${tx.dateTime.month}/${tx.dateTime.year}'),
-                      trailing: Text(tx.nominalStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                      title: Text(
+                        tx.merchant,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '${tx.dateTime.day}/${tx.dateTime.month}/${tx.dateTime.year}',
+                      ),
+                      trailing: Text(
+                        tx.nominalStr,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
                     );
                   },
                 ),
