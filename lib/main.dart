@@ -84,9 +84,12 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       final inputImage = InputImage.fromFile(imageFile);
       final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      final spatialText = OcrService.extractSpatialText(recognizedText);
       
       setState(() {
-        _rawDebugText = recognizedText.text.isNotEmpty ? recognizedText.text : "Tidak ada teks yang terdeteksi.";
+        _rawDebugText = spatialText.isNotEmpty
+            ? spatialText
+            : "Tidak ada teks yang terdeteksi.";
       });
       
       await textRecognizer.close();

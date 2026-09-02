@@ -6,6 +6,8 @@ import 'parsers/bca_syariah_parser.dart';
 import 'parsers/bri_parser.dart';
 import 'parsers/gopay_parser.dart';
 import 'parsers/mandiri_parser.dart'; // <-- Import Mandiri Parser
+import 'parsers/ovo_parser.dart';
+import 'parsers/jago_syariah_parser.dart';
 
 class QrisParser {
   static TransactionModel parseReceipt(String rawText) {
@@ -15,6 +17,10 @@ class QrisParser {
     // ROUTER BERBASIS APLIKASI
     if (ShopeePayParser.isMatch(rawText)) {
       return ShopeePayParser.parse(rawText, cleanedLines);
+    } else if (OvoParser.isMatch(rawText)) {
+      return OvoParser.parse(rawText, cleanedLines);
+    } else if (JagoSyariahParser.isMatch(rawText)) {
+      return JagoSyariahParser.parse(rawText, cleanedLines);
     } else if (DanaParser.isMatch(rawText)) {
       return DanaParser.parse(rawText, cleanedLines);
     } else if (BcaParser.isMatch(rawText)) {

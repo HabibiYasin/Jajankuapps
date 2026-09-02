@@ -1,32 +1,32 @@
 import 'dart:io';
+import 'dart:math'; // <-- PENTING: Tambahkan import math untuk fungsi min() & max()
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../models/transaction_model.dart';
 import 'qris_parser.dart';
 
 class OcrService {
   static Future<TransactionModel> processImage(File imageFile) async {
-    final textRecognizer = TextRecognizer();
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     final inputImage = InputImage.fromFile(imageFile);
     
     try {
       final recognizedText = await textRecognizer.processImage(inputImage);
       
-      // 1. Ambil data dasar dari parser QRIS (merchant, nominal, kategori)
-      final transaction = QrisParser.parseReceipt(recognizedText.text);
+      // Menggabungkan teks menggunakan Intersection / Tumpang Tindih
+      String formattedText = extractSpatialText(recognizedText);
       
-      // 2. Ekstrak tanggal & jam dari teks screenshot (mendukung format angka & teks bulan)
-      DateTime receiptDateTime = _extractDateTimeFromOCR(recognizedText.text);
+      final transaction = QrisParser.parseReceipt(formattedText);
+      DateTime receiptDateTime = _extractDateTimeFromOCR(formattedText);
       
       textRecognizer.close();
 
-      // 3. Kembalikan TransactionModel dengan tanggal yang diperbarui dari OCR
       return TransactionModel(
         merchant: transaction.merchant,
         category: transaction.category,
         nominalStr: transaction.nominalStr,
         numericNominal: transaction.numericNominal,
-        dateTime: receiptDateTime, // Menggunakan waktu dari screenshot
-        source: transaction.source,
+        dateTime: receiptDateTime,
+        source: transaction.source, 
       );
     } catch (e) {
       textRecognizer.close();
@@ -34,30 +34,144 @@ class OcrService {
     }
   }
 
-  // Helper untuk mendeteksi tanggal & jam dari teks OCR secara presisi (Angka & Teks Bulan)
-  static DateTime _extractDateTimeFromOCR(String recognizedText) {
-    // 1. Format angka (misal: 20/08/2026 atau 20-08-2026)
-    final dateRegexNumeric = RegExp(r'\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b');
+  // FUNGSI SPASIAL INTERSECTION (Paling Akurat):
+  // Menyatukan teks kiri dan kanan berdasarkan tumpang tindih jalur horizontal
+  static String extractSpatialText(RecognizedText recognizedText) {
+    List<TextLine> allLines = [];
     
-    // 2. Format teks dengan nama bulan Indonesia/Inggris (misal: 20 Ags 2026)
-    final dateRegexText = RegExp(r'\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})\b');
+    for (TextBlock block in recognizedText.blocks) {
+      allLines.addAll(block.lines);
+    }
 
-    // 3. Format jam (HH:MM atau HH:MM:SS, mendukung AM/PM)
+    if (allLines.isEmpty) return "";
+
+    List<List<TextLine>> rows = [];
+
+    for (TextLine line in allLines) {
+      bool addedToRow = false;
+      
+      final lineHeight = line.boundingBox.height;
+      final lineCenterY = line.boundingBox.center.dy;
+
+      for (List<TextLine> row in rows) {
+        final rowCenterY = row
+                .map((e) => e.boundingBox.center.dy)
+                .reduce((a, b) => a + b) /
+            row.length;
+        final rowAverageHeight = row
+                .map((e) => e.boundingBox.height)
+                .reduce((a, b) => a + b) /
+            row.length;
+
+        // Bandingkan pusat vertikal, bukan tinggi gabungan row. Tinggi gabungan
+        // dapat membesar dan menyebabkan teks dari baris tetangga ikut tertarik.
+        final tolerance = min(lineHeight, rowAverageHeight) * 0.45;
+        if ((lineCenterY - rowCenterY).abs() <= tolerance) {
+          row.add(line);
+          addedToRow = true;
+          break;
+        }
+      }
+
+      // Buat baris baru jika teks tidak sejajar dengan baris manapun
+      if (!addedToRow) {
+        rows.add([line]);
+      }
+    }
+
+    // Urutkan baris dari atas ke bawah layar
+    rows.sort((a, b) {
+      double aTop = a.map((e) => e.boundingBox.top).reduce(min);
+      double bTop = b.map((e) => e.boundingBox.top).reduce(min);
+      return aTop.compareTo(bTop);
+    });
+
+    // Urutkan teks di dalam baris dari kiri ke kanan, lalu gabungkan dengan spasi
+    List<String> combinedText = [];
+    for (List<TextLine> row in rows) {
+      row.sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
+      combinedText.add(row.map((e) => e.text).join(' '));
+    }
+
+    return _normalizeReceiptRows(combinedText).join('\n');
+  }
+
+  static List<String> _normalizeReceiptRows(List<String> rows) {
+    final normalized = List<String>.from(rows);
+
+    for (int i = 0; i < normalized.length; i++) {
+      // Logo Jago dapat dikenali sebagai "Uago" atau karakter beraksen lain.
+      // Field Jago memang tersusun vertikal, sehingga baris label dan nilainya
+      // sengaja tidak digabung di tahap OCR.
+      normalized[i] = normalized[i].replaceFirst(
+        RegExp(r'^\S*ago\s+Syariah$', caseSensitive: false),
+        'Jago Syariah',
+      );
+
+      // Watermark BCA Syariah kadang terbaca sebagai "Aarnah" tepat di
+      // antara label Tujuan dan nama merchant.
+      normalized[i] = normalized[i].replaceFirst(
+        RegExp(r'^(Tujuan)\s+Aarnah\s+', caseSensitive: false),
+        r'$1 ',
+      );
+
+      final sourceMatch = RegExp(
+        r'^Sumber\s+Dana(?:\s+(.*))?$',
+        caseSensitive: false,
+      ).firstMatch(normalized[i]);
+      if (sourceMatch == null || i == 0) continue;
+
+      final previous = normalized[i - 1].trim();
+      var accountNumber = (sourceMatch.group(1) ?? '').trim();
+      final looksLikeAccountName = RegExp(r'^[A-Z][A-Z\s.]{3,}$').hasMatch(previous);
+      var accountIsOnNextRow = false;
+
+      if (!RegExp(r'\d{3,}\*+\d+').hasMatch(accountNumber) &&
+          i + 1 < normalized.length &&
+          RegExp(r'^\d{3,}\*+\d+$').hasMatch(normalized[i + 1].trim())) {
+        accountNumber = normalized[i + 1].trim();
+        accountIsOnNextRow = true;
+      }
+
+      final hasMaskedAccount = RegExp(r'\d{3,}\*+\d+').hasMatch(accountNumber);
+
+      // Pada layout BCA Syariah, nama dan nomor sumber dana berada pada dua
+      // baris kanan. OCR dapat menaruh nama satu baris sebelum labelnya.
+      if (looksLikeAccountName && hasMaskedAccount) {
+        normalized[i] = 'Sumber Dana $previous $accountNumber';
+        if (accountIsOnNextRow) normalized.removeAt(i + 1);
+        normalized.removeAt(i - 1);
+        i--;
+      }
+    }
+
+    return normalized;
+  }
+
+  static DateTime _extractDateTimeFromOCR(String recognizedText) {
+    final dateRegexNumeric = RegExp(r'\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b');
+    // Gunakan spasi horizontal, bukan \s, supaya regex tidak menyeberang
+    // newline (misalnya "18:16\nTanggal 26" menjadi "16 Tanggal 26").
+    final dateRegexText = RegExp(
+      r'\b(\d{1,2})[ \t]+([A-Za-z]{3,9})[ \t]+(\d{2,4})\b',
+    );
     final timeRegex = RegExp(r'\b([0-1]?[0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?\s*([APap][Mm])?\b');
 
     int? day, month, year;
     int hour = 0, minute = 0, second = 0;
 
-    // Cek format teks bulan terlebih dahulu (untuk struk seperti "20 Ags 2026")
-    final textMatch = dateRegexText.firstMatch(recognizedText);
-    if (textMatch != null) {
+    for (final textMatch in dateRegexText.allMatches(recognizedText)) {
+      final parsedMonth = _parseIndonesianMonth(textMatch.group(2)!);
+      if (parsedMonth == null) continue;
+
       day = int.parse(textMatch.group(1)!);
-      String monthStr = textMatch.group(2)!.toLowerCase();
-      month = _parseIndonesianMonth(monthStr);
-      int parsedYear = int.parse(textMatch.group(3)!);
+      month = parsedMonth;
+      final parsedYear = int.parse(textMatch.group(3)!);
       year = parsedYear < 100 ? 2000 + parsedYear : parsedYear;
-    } else {
-      // Jika tidak ketemu, coba format angka biasa
+      break;
+    }
+
+    if (day == null) {
       final numericMatch = dateRegexNumeric.firstMatch(recognizedText);
       if (numericMatch != null) {
         day = int.parse(numericMatch.group(1)!);
@@ -67,7 +181,6 @@ class OcrService {
       }
     }
 
-    // Parsing Jam & AM/PM
     final timeMatch = timeRegex.firstMatch(recognizedText);
     if (timeMatch != null) {
       hour = int.parse(timeMatch.group(1)!);
@@ -76,7 +189,6 @@ class OcrService {
         second = int.parse(timeMatch.group(3)!);
       }
       
-      // Penyesuaian AM/PM
       String? amPm = timeMatch.group(4);
       if (amPm != null) {
         if (amPm.toUpperCase() == 'PM' && hour < 12) hour += 12;
@@ -84,26 +196,20 @@ class OcrService {
       }
     }
 
-    // Jika tanggal lengkap ditemukan, gunakan tanggal tersebut
     if (day != null && month != null && year != null) {
       return DateTime(year, month, day, hour, minute, second);
     }
 
-    return DateTime.now(); // Fallback jika tidak ada tanggal yang terdeteksi
+    return DateTime.now(); 
   }
 
-  // Helper untuk konversi nama bulan teks ke angka
-  static int _parseIndonesianMonth(String monthStr) {
-    // Normalisasi teks: Ubah ke huruf kecil dan koreksi typo OCR umum
-    // - Mengubah 'l' atau '1' menjadi 'i'
-    // - Mengubah 'q' menjadi 'g'
-    // - Mengubah '0' menjadi 'o' (mengantisipasi angka nol tertukar huruf o)
+  static int? _parseIndonesianMonth(String monthStr) {
     String sanitized = monthStr.toLowerCase()
         .replaceAll('1', 'i')
         .replaceAll('l', 'i') 
         .replaceAll('q', 'g')
         .replaceAll('0', 'o')
-        .replaceAll('5', 's'); // Ubah huruf S jadi angka 5 (jika dalam konteks angka);
+        .replaceAll('5', 's'); 
 
     const months = {
       'jan': 1, 'januari': 1,
@@ -120,6 +226,7 @@ class OcrService {
       'des': 12, 'desember': 12, 'dec': 12,
     };
 
-    return months[sanitized] ?? 1; // Default ke Januari (1) jika benar-benar tidak dikenali
+    // Bulan yang tidak dikenal tidak boleh diam-diam dianggap Januari.
+    return months[sanitized];
   }
 }

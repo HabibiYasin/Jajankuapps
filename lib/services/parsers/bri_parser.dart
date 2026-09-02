@@ -28,26 +28,29 @@ class BriParser {
     String cleanNum = nominalStr.replaceAll(RegExp(r'[^0-9]'), '');
     numericVal = double.tryParse(cleanNum) ?? 0;
 
-    // 2. AMBIL NAMA MERCHANT TEPAT DI ATAS KATA "CATATAN"
-    for (int i = 0; i < cleanedLines.length; i++) {
-      String lowerLine = cleanedLines[i].toLowerCase();
-      
-      // Jika mendeteksi kata "Catatan", ambil baris tepat di atasnya
-      if (lowerLine.contains("catatan") && i > 0) {
-        String candidate = cleanedLines[i - 1];
-        // Pastikan bukan label atau nominal
-        if (!candidate.toLowerCase().contains("rp") && candidate.length > 3) {
-          merchantName = candidate;
-          break;
-        }
-      }
+    // 2. AMBIL FIELD "NAMA MERCHANT". Nilainya bisa berada pada baris yang
+    // sama dan berlanjut ke baris berikutnya, misalnya:
+    // Nama Merchant MbI365739 Konter
+    // Ryan Nug
+    // Lokasi Merchant KUNINGAN
+    merchantName = _valueWithContinuation(
+      cleanedLines,
+      label: 'nama merchant',
+    );
+
+    // Pada ringkasan bagian atas, merchant juga ditampilkan setelah "Tujuan".
+    if (merchantName == "Tidak Diketahui") {
+      merchantName = _valueWithContinuation(
+        cleanedLines,
+        label: 'tujuan',
+      );
     }
 
-    // Fallback cadangan jika posisi "catatan" meleset
+    // Fallback cadangan untuk variasi struk lama.
     if (merchantName == "Tidak Diketahui") {
-      for (int i = 0; i < cleanedLines.length; i++) {
-        String line = cleanedLines[i];
-        if (line.contains("Konter") || line.contains("MbI365739")) {
+      for (String line in cleanedLines) {
+        final lower = line.toLowerCase();
+        if (lower.contains("konter") || lower.contains("merchant")) {
           merchantName = line;
           break;
         }
@@ -71,5 +74,65 @@ class BriParser {
       numericNominal: numericVal,
       source: "BRImo", 
     );
+  }
+
+  static String _valueWithContinuation(
+    List<String> lines, {
+    required String label,
+  }) {
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      final lower = line.toLowerCase();
+      if (!lower.startsWith(label)) continue;
+
+      final parts = <String>[];
+      final inlineValue = line.substring(label.length).trim();
+      if (inlineValue.isNotEmpty) parts.add(inlineValue);
+
+      for (int j = i + 1; j < lines.length; j++) {
+        final next = lines[j].trim();
+        if (_isBriFieldLabel(next)) break;
+        if (_isMerchantContinuation(next)) parts.add(next);
+      }
+
+      if (parts.isNotEmpty) return parts.join(' ');
+    }
+
+    return "Tidak Diketahui";
+  }
+
+  static bool _isBriFieldLabel(String line) {
+    final lower = line.toLowerCase();
+    const labels = <String>[
+      'total transaksi',
+      'no. ref',
+      'sumber dana',
+      'tujuan',
+      'id ',
+      'jenis transaksi',
+      'nama merchant',
+      'lokasi merchant',
+      'nama penerbit',
+      'nama pengakuisisi',
+      'nomor invoice',
+      'kode pan pelanggan',
+      'merchant pan',
+      'id terminal',
+      'catatan',
+      'nominal pembayaran',
+      'pembayaran',
+      'biaya admin',
+      'informasi',
+    ];
+    return labels.any(lower.startsWith);
+  }
+
+  static bool _isMerchantContinuation(String line) {
+    final lower = line.toLowerCase();
+    return line.isNotEmpty &&
+        !RegExp(r'^rp\s*[0-9]', caseSensitive: false).hasMatch(line) &&
+        !RegExp(r'^\d{6,}$').hasMatch(line) &&
+        lower != 'qris bayar' &&
+        lower != 'sukses';
   }
 }

@@ -18,6 +18,7 @@ dependencies:
   path_provider: ^2.1.2
   share_plus: ^10.1.2
   receive_sharing_intent: ^1.8.1
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -27,6 +28,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/
 
 # Konfigurasi ikon aplikasi diletakkan di paling bawah
 flutter_launcher_icons:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/transaction_model.dart';
 import 'top_categories_widget.dart';
 import '../services/export_service.dart';
@@ -9,7 +10,7 @@ class DashboardScreen extends StatefulWidget {
   final double monthlyLimit;
   final Function(int) onDelete;
   final Function(int, DateTime) onUpdateDate;
-  final Function(TransactionModel) onUpdateTransaction; // Tambahkan callback ini untuk update data SQLite
+  final Function(TransactionModel) onUpdateTransaction;
 
   const DashboardScreen({
     super.key, 
@@ -18,7 +19,7 @@ class DashboardScreen extends StatefulWidget {
     required this.monthlyLimit, 
     required this.onDelete, 
     required this.onUpdateDate,
-    required this.onUpdateTransaction, // Wajib ditambahkan di main.dart nanti
+    required this.onUpdateTransaction,
   });
 
   @override
@@ -28,6 +29,110 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   String _searchQuery = "";
   String _selectedCategory = "Semua";
+
+  @override
+  void initState() {
+    super.initState();
+    // Menjalankan pengecekan popup tutorial setelah frame pertama selesai dirender
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTutorialPopup();
+    });
+  }
+
+  Future<void> _checkAndShowTutorialPopup() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // 1. Cek jumlah kemunculan (Max 5x)
+    int showCount = prefs.getInt('tutorial_show_count') ?? 0;
+    if (showCount >= 5) return;
+
+    // 2. Cek apakah tombol "Jangan tunjukkan hari ini" aktif
+    String? lastHiddenDate = prefs.getString('tutorial_hidden_date');
+    if (lastHiddenDate != null) {
+      DateTime hideDate = DateTime.parse(lastHiddenDate);
+      DateTime now = DateTime.now();
+      
+      if (now.year == hideDate.year && now.month == hideDate.month && now.day == hideDate.day) {
+        return;
+      }
+    }
+
+    // Update jumlah kemunculan dan tampilkan popup
+    await prefs.setInt('tutorial_show_count', showCount + 1);
+    if (!mounted) return;
+    _showTutorialDialog();
+  }
+
+  void _showTutorialDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.all(16),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/icon/tutorial.png',
+                  height: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text("Gambar tutorial.png tidak ditemukan di assets/icon/", textAlign: TextAlign.center, style: TextStyle(color: Colors.red, fontSize: 12)),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Cara Pakai QRIS Tracker',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Scan struk atau bagikan gambar dari galeri Anda untuk mencatat pengeluaran otomatis.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              
+              TextButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  String todayStr = DateTime.now().toIso8601String();
+                  await prefs.setString('tutorial_hidden_date', todayStr);
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Jangan tunjukkan hari ini',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+              
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Mengerti / Close'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   double _calculateTodayTotal() {
     double total = 0; DateTime now = DateTime.now();
@@ -74,7 +179,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return bars;
   }
 
-  // Fungsi Dialog Edit Transaksi
   void _showEditTransactionDialog(BuildContext context, TransactionModel tx, StateSetter setModalState) {
     final merchantController = TextEditingController(text: tx.merchant);
     final sourceController = TextEditingController(text: tx.source);
@@ -113,7 +217,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const Text('Jenis Transaksi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     const SizedBox(height: 4),
                     DropdownButtonFormField<String>(
-                      value: selectedCategory,
+                      initialValue: selectedCategory,
                       decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                       items: availableCategories.map((String cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
                       onChanged: (val) {
@@ -133,9 +237,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       tx.source = sourceController.text;
                       tx.category = selectedCategory;
                     });
-                    widget.onUpdateTransaction(tx); // Panggil fungsi update SQLite
-                    setModalState(() {}); // Refresh modal bottom sheet
-                    Navigator.pop(context); // Tutup dialog
+                    widget.onUpdateTransaction(tx);
+                    setModalState(() {});
+                    Navigator.pop(context);
                   },
                   child: const Text('Simpan'),
                 ),
@@ -164,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero, 
                     title: Text(tx.merchant, style: const TextStyle(fontSize: 18)), 
-                    subtitle: Text('${tx.category} • Sumber: ${tx.source}'), // Menampilkan sumber aplikasi QRIS
+                    subtitle: Text('${tx.category} • Sumber: ${tx.source}'),
                     trailing: Text(tx.nominalStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.teal))
                   ),
                   ListTile(
@@ -172,7 +276,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Tombol Edit dan Ubah Tanggal
                   Row(
                     children: [
                       Expanded(
@@ -181,8 +284,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           label: const Text('Ubah Tanggal'), 
                           onPressed: () async {
                             DateTime? pickedDate = await showDatePicker(context: context, initialDate: tx.dateTime, firstDate: DateTime(2020), lastDate: DateTime(2100));
+                            if (!context.mounted) return;
                             if (pickedDate != null) {
                               TimeOfDay? pickedTime = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(tx.dateTime));
+                              if (!context.mounted) return;
                               if (pickedTime != null) {
                                 widget.onUpdateDate(index, DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute));
                                 setModalState(() {}); setState(() {});
