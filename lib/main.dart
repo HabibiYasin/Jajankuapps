@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -11,17 +12,31 @@ import 'services/ocr_service.dart';
 import 'services/database_helper.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/scanner_screen.dart';
-import 'screens/settings_screen.dart';
+import 'screens/personalization_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() => runApp(
-  MaterialApp(
-    title: 'Jajanku',
-    theme: AppTheme.light,
-    home: const QrisTrackerApp(),
-    debugShowCheckedModeBanner: false,
-  ),
-);
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (error) {
+    debugPrint('Firebase gagal diinisialisasi: $error');
+  }
+
+  runApp(
+    MaterialApp(
+      title: 'Jajanku',
+      theme: AppTheme.light,
+      home: const QrisTrackerApp(),
+      debugShowCheckedModeBanner: false,
+    ),
+  );
+}
 
 class QrisTrackerApp extends StatefulWidget {
   const QrisTrackerApp({super.key});
@@ -247,7 +262,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
             imageFile: _imageFile,
             rawTextDebug: _rawDebugText,
           ),
-          SettingsScreen(
+          PersonalizationScreen(
             userName: _userName,
             userRole: _userRole,
             dailyLimit: _dailyBudgetLimit,
@@ -296,7 +311,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
               NavigationDestination(
                 icon: Icon(Icons.tune_rounded),
                 selectedIcon: Icon(Icons.tune_rounded, color: AppColors.teal),
-                label: 'Pengaturan',
+                label: 'Personalisasi',
               ),
             ],
           ),
