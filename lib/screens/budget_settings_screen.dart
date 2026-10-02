@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/budget_limits.dart';
 import '../services/account_data_service.dart';
+import '../services/auth_service.dart';
 
 class BudgetSettingsScreen extends StatefulWidget {
   final double dailyLimit, weeklyLimit, monthlyLimit;
@@ -65,6 +66,13 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
   );
 
   Future<void> _save() async {
+    if (_owner == null || AuthService.instance.currentUser?.uid != _owner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kamu harus login dulu sebelum catat')),
+      );
+      Navigator.pop(context);
+      return;
+    }
     if (!_form.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
@@ -80,7 +88,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _owner == null ? 'Budget disimpan di HP ini.' : 'Perubahan budget diterima. Lihat status sinkronisasi di Personalisasi.',
+            'Perubahan budget diterima. Lihat status sinkronisasi di Personalisasi.',
           ),
         ),
       );

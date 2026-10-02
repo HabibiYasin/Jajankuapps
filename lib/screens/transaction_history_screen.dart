@@ -334,7 +334,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               hintText: 'Cari nama merchant...',
               prefixIcon: const Icon(Icons.search, color: Colors.teal),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Theme.of(context).colorScheme.surface,
               contentPadding: const EdgeInsets.symmetric(
                 vertical: 0,
                 horizontal: 16,
@@ -370,7 +370,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     selected: isSelected,
                     selectedColor: Colors.teal,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black87,
+                      color: isSelected
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurface,
                       fontWeight: isSelected
                           ? FontWeight.bold
                           : FontWeight.normal,

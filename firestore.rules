@@ -18,6 +18,24 @@ service cloud.firestore {
     function positiveAmount(value) {
       return value is number && value > 0 && value <= 1000000000000000;
     }
+    match /users/{uid} {
+      allow get: if owns(uid);
+      allow create: if owns(uid)
+        && request.resource.data.keys().hasAll(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
+        && request.resource.data.plan == 'free'
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.providers is list
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.lastLoginAt == request.time;
+      allow update: if owns(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'displayName', 'providers', 'lastLoginAt'])
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.providers is list
+        && request.resource.data.lastLoginAt == request.time;
+    }
     match /users/{uid}/transactions/{id} {
       allow read, delete: if owns(uid);
       allow create, update: if owns(uid) && validTransaction();

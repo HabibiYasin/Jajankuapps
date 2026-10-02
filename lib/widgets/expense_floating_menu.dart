@@ -40,7 +40,7 @@ class _ExpenseFloatingMenuState extends State<ExpenseFloatingMenu> {
           child: FloatingActionButton.small(
             heroTag: label,
             tooltip: label,
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             foregroundColor: AppColors.teal,
             onPressed: () async {
               setState(() => _isOpen = false);

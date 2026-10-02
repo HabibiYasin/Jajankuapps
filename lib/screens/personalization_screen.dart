@@ -9,6 +9,7 @@ import '../services/account_data_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tutorial_dialog.dart';
 import 'budget_settings_screen.dart';
+import 'login_screen.dart';
 
 enum UserTier {
   guest('Jajaners CobaCoba'),
@@ -154,11 +155,13 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
   Future<void> _signIn() async {
     setState(() => _loading = true);
     try {
-      await AuthService.instance.signInWithGoogle();
+      await Navigator.of(context)
+          .push<bool>(MaterialPageRoute(builder: (_) => const LoginScreen()));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Login Google gagal: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Halaman login gagal dibuka.')),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -384,16 +387,20 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
             icon: Icons.account_balance_wallet_outlined,
             title: 'Limit Budget',
             subtitle: 'Atur batas harian, mingguan, dan bulanan',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => BudgetSettingsScreen(
-                  dailyLimit: widget.dailyLimit,
-                  weeklyLimit: widget.weeklyLimit,
-                  monthlyLimit: widget.monthlyLimit,
+            onTap: () async {
+              if (!await requireLogin(context) || !context.mounted) return;
+              final limits = AccountDataService.instance.limits;
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BudgetSettingsScreen(
+                    dailyLimit: limits.daily,
+                    weeklyLimit: limits.weekly,
+                    monthlyLimit: limits.monthly,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           _menuTile(
             icon: Icons.help_outline,
@@ -418,13 +425,13 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Jalankan flutterfire configure untuk mengaktifkan Login Google.',
+                      'Login belum tersedia. Silakan coba lagi nanti.',
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _loading ? null : _signIn,
                       icon: const Icon(Icons.login),
-                      label: const Text('Coba Login Google'),
+                      label: const Text('Login'),
                     ),
                   ],
                 ),
@@ -444,9 +451,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : Icon(loggedIn ? Icons.logout : Icons.login),
-                  label: Text(
-                    loggedIn ? 'Keluar dari akun' : 'Masuk dengan Google',
-                  ),
+                  label: Text(loggedIn ? 'Keluar dari akun' : 'Login'),
                 );
               },
             ),

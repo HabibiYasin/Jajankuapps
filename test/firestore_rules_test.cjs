@@ -35,6 +35,28 @@ async function query(uid, owner, expected) {
   assert.equal(result.status, expected, await result.text()); checks++;
 }
 (async () => {
+  async function profileWrite(uid, plan, create = false) {
+    const result = await fetch(`${base}:commit`, {
+      method: 'POST', headers: {'Content-Type':'application/json', Authorization:`Bearer ${token(uid)}`},
+      body: JSON.stringify({writes: [{
+        update: {name: `projects/demo-jajanku/databases/(default)/documents/users/${uid}`,
+          fields: {email:{stringValue:'test@example.com'},displayName:{stringValue:''},
+            providers:{arrayValue:{values:[{stringValue:'password'}]}},plan:{stringValue:plan}}},
+        updateTransforms: [ ...(create ? [{fieldPath:'createdAt',setToServerValue:'REQUEST_TIME'}] : []),
+          {fieldPath:'lastLoginAt',setToServerValue:'REQUEST_TIME'}],
+        ...(create ? {} : {updateMask:{fieldPaths:['email','displayName','providers','plan']}}),
+      }]}),
+    });
+    checks++;
+    return result.status;
+  }
+  assert.equal(await profileWrite('profile-user','vip',true),403);
+  assert.equal(await profileWrite('profile-user','free',true),200);
+  await request('GET','users/profile-user','profile-user');
+  await request('GET','users/profile-user','bob',undefined,403);
+  assert.equal(await profileWrite('profile-user','vip'),403);
+  assert.equal(await profileWrite('profile-user','free'),200);
+  await request('DELETE','users/profile-user','profile-user',undefined,403);
   const tx = 'users/alice/transactions/one';
   await request('GET',tx,null,undefined,403);
   await request('PATCH',tx,null,transaction,403);

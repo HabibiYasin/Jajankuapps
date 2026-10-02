@@ -11,19 +11,27 @@ abstract final class AppColors {
 }
 
 abstract final class AppTheme {
-  static ThemeData get light {
+  static ThemeData get light => _build(Brightness.light);
+  static ThemeData get dark => _build(Brightness.dark);
+
+  static ThemeData _build(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF202A2E) : AppColors.surface;
+    final foreground = isDark ? const Color(0xFFE8EFF2) : AppColors.charcoal;
     final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.teal,
-      brightness: Brightness.light,
-      primary: AppColors.teal,
+      brightness: brightness,
+      primary: isDark ? AppColors.aqua : AppColors.teal,
       secondary: AppColors.pink,
-      surface: AppColors.surface,
+      surface: surface,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: isDark
+          ? const Color(0xFF131B1F)
+          : AppColors.background,
       fontFamily: 'Roboto',
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -32,7 +40,7 @@ abstract final class AppTheme {
         centerTitle: false,
       ),
       cardTheme: CardThemeData(
-        color: AppColors.surface,
+        color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
@@ -53,7 +61,7 @@ abstract final class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
@@ -68,13 +76,13 @@ abstract final class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: surface,
         indicatorColor: AppColors.aqua.withValues(alpha: 0.35),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           return TextStyle(
             color: states.contains(WidgetState.selected)
-                ? AppColors.teal
-                : AppColors.charcoal.withValues(alpha: 0.6),
+                ? scheme.primary
+                : foreground.withValues(alpha: 0.7),
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,
@@ -82,16 +90,10 @@ abstract final class AppTheme {
           );
         }),
       ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(
-          color: AppColors.charcoal,
-          fontWeight: FontWeight.w800,
-        ),
-        titleMedium: TextStyle(
-          color: AppColors.charcoal,
-          fontWeight: FontWeight.w700,
-        ),
-        bodyMedium: TextStyle(color: AppColors.charcoal),
+      textTheme: TextTheme(
+        titleLarge: TextStyle(color: foreground, fontWeight: FontWeight.w800),
+        titleMedium: TextStyle(color: foreground, fontWeight: FontWeight.w700),
+        bodyMedium: TextStyle(color: foreground),
       ),
     );
   }

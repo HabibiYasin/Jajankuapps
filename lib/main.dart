@@ -4,16 +4,19 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'models/transaction_model.dart';
 import 'services/ocr_service.dart';
 import 'services/account_data_service.dart';
+import 'services/auth_service.dart';
 import 'services/budget_notification_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/transaction_history_screen.dart';
 import 'widgets/expense_floating_menu.dart';
 import 'screens/manual_expense_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/personalization_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -30,18 +33,55 @@ Future<void> main() async {
     debugPrint('Firebase gagal diinisialisasi: $error');
   }
 
-  runApp(
-    MaterialApp(
+  final user = AuthService.instance.currentUser;
+  if (user != null) {
+    try {
+      await AuthService.instance
+          .syncProfile(user)
+          .timeout(const Duration(seconds: 10));
+    } catch (error) {
+      debugPrint('Profil akun belum tersinkron: $error');
+    }
+  }
+
+  final preferences = await SharedPreferences.getInstance();
+  runApp(JajankuApp(preferences: preferences));
+}
+
+class JajankuApp extends StatefulWidget {
+  const JajankuApp({super.key, required this.preferences});
+
+  final SharedPreferences preferences;
+
+  @override
+  State<JajankuApp> createState() => _JajankuAppState();
+}
+
+class _JajankuAppState extends State<JajankuApp> {
+  late bool _isDark = widget.preferences.getBool('dark_mode') ?? false;
+
+  Future<void> _toggleTheme() async {
+    setState(() => _isDark = !_isDark);
+    await widget.preferences.setBool('dark_mode', _isDark);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
       title: 'Jajanku',
       theme: AppTheme.light,
-      home: const QrisTrackerApp(),
+      darkTheme: AppTheme.dark,
+      themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
+      home: QrisTrackerApp(onToggleTheme: _toggleTheme),
       debugShowCheckedModeBanner: false,
-    ),
-  );
+    );
+  }
 }
 
 class QrisTrackerApp extends StatefulWidget {
-  const QrisTrackerApp({super.key});
+  const QrisTrackerApp({super.key, this.onToggleTheme});
+
+  final VoidCallback? onToggleTheme;
   @override
   State<QrisTrackerApp> createState() => _QrisTrackerAppState();
 }
@@ -127,6 +167,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   }
 
   Future<void> _processSharedImageFile(File imageFile) async {
+    if (!await requireLogin(context) || !mounted) return;
     final owner = _accountData.uid;
     try {
       setState(() {
@@ -174,6 +215,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   }
 
   Future<void> _processImage(ImageSource source) async {
+    if (!await requireLogin(context) || !mounted) return;
     try {
       final pickedFile = await _picker.pickImage(source: source);
       if (pickedFile == null || !mounted) return;
@@ -187,6 +229,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   }
 
   Future<void> _recordManualExpense() async {
+    if (!await requireLogin(context) || !mounted) return;
     final owner = _accountData.uid;
     final tx = await Navigator.of(context).push<TransactionModel>(
       MaterialPageRoute(builder: (_) => const ManualExpenseScreen()),
@@ -293,9 +336,20 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              backgroundColor: Colors.white.withValues(alpha: 0.18),
-              child: const Icon(Icons.account_balance_wallet_outlined),
+            child: IconButton.filledTonal(
+              onPressed: widget.onToggleTheme,
+              tooltip: Theme.of(context).brightness == Brightness.dark
+                  ? 'Aktifkan mode terang'
+                  : 'Aktifkan mode gelap',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.18),
+                foregroundColor: Colors.white,
+              ),
+              icon: Icon(
+                Theme.of(context).brightness == Brightness.dark
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+              ),
             ),
           ),
         ],
@@ -337,7 +391,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         child: Container(
           margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
