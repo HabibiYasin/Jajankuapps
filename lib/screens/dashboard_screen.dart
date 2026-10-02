@@ -65,28 +65,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await showTutorialDialog(context, allowHideToday: true);
   }
 
-  double _calculateTodayTotal() {
-    double total = 0;
-    DateTime now = DateTime.now();
-    for (var tx in widget.history) {
-      if (tx.dateTime.year == now.year &&
-          tx.dateTime.month == now.month &&
-          tx.dateTime.day == now.day) {
-        total += tx.numericNominal;
-      }
-    }
-    return total;
+  double _calculateTotal(DateTime period, {bool monthly = false}) {
+    return widget.history
+        .where((tx) {
+          final date = tx.dateTime;
+          return date.year == period.year &&
+              date.month == period.month &&
+              (monthly || date.day == period.day);
+        })
+        .fold(0.0, (total, tx) => total + tx.numericNominal);
   }
 
-  double _calculateMonthlyTotal() {
-    double total = 0;
-    DateTime now = DateTime.now();
-    for (var tx in widget.history) {
-      if (tx.dateTime.year == now.year && tx.dateTime.month == now.month) {
-        total += tx.numericNominal;
-      }
-    }
-    return total;
+  String _formatAmount(double amount) {
+    if (amount.abs() < 1000) return amount.toStringAsFixed(0);
+    final thousands = (amount / 1000)
+        .toStringAsFixed(2)
+        .replaceFirst(RegExp(r'\.?0+$'), '');
+    return '${thousands.replaceAll('.', ',')}K';
   }
 
   String _getMonthName(int monthNumber) {
@@ -131,7 +126,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildSummaryCard({
     required String label,
     required String value,
-    required double progress,
+    required double total,
+    required double budget,
     required IconData icon,
     required Color accent,
   }) {
@@ -166,19 +162,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
             const SizedBox(height: 3),
-            Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.charcoal,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.charcoal,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Maks. budget: Rp${_formatAmount(budget)}',
+              style: const TextStyle(color: Colors.grey, fontSize: 11),
             ),
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
+                value: budget > 0 ? (total / budget).clamp(0.0, 1.0) : 0.0,
                 minHeight: 6,
                 backgroundColor: AppColors.mist.withValues(alpha: 0.3),
                 color: accent,
@@ -220,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             if (t > 0)
               Text(
-                '${(t / 1000).toStringAsFixed(0)}k',
+                _formatAmount(t),
                 style: const TextStyle(fontSize: 10, color: Colors.grey),
               ),
             const SizedBox(height: 6),
@@ -250,8 +255,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentDaily = _calculateTodayTotal();
-    final currentMonthly = _calculateMonthlyTotal();
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final lastMonth = DateTime(now.year, now.month - 1);
+    final currentDaily = _calculateTotal(now);
+    final yesterdayTotal = _calculateTotal(yesterday);
+    final currentMonthly = _calculateTotal(now, monthly: true);
+    final lastMonthly = _calculateTotal(lastMonth, monthly: true);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
@@ -261,8 +271,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _buildSummaryCard(
                 label: 'Hari Ini',
-                value: 'Rp${currentDaily.toStringAsFixed(0)}',
-                progress: currentDaily / widget.dailyLimit,
+                value: 'Rp${_formatAmount(currentDaily)}',
+                total: currentDaily,
+                budget: widget.dailyLimit,
                 icon: Icons.today_rounded,
                 accent: currentDaily >= widget.dailyLimit
                     ? AppColors.pink
@@ -270,9 +281,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(width: 12),
               _buildSummaryCard(
-                label: 'Bulan Ini (${_getMonthName(DateTime.now().month)})',
-                value: 'Rp${currentMonthly.toStringAsFixed(0)}',
-                progress: currentMonthly / widget.monthlyLimit,
+                label: 'Kemarin',
+                value: 'Rp${_formatAmount(yesterdayTotal)}',
+                total: yesterdayTotal,
+                budget: widget.dailyLimit,
+                icon: Icons.history_rounded,
+                accent: yesterdayTotal >= widget.dailyLimit
+                    ? AppColors.pink
+                    : AppColors.teal,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildSummaryCard(
+                label: 'Bulan Kemarin (${_getMonthName(lastMonth.month)})',
+                value: 'Rp${_formatAmount(lastMonthly)}',
+                total: lastMonthly,
+                budget: widget.monthlyLimit,
+                icon: Icons.calendar_month_rounded,
+                accent: lastMonthly >= widget.monthlyLimit
+                    ? AppColors.pink
+                    : AppColors.aqua,
+              ),
+              const SizedBox(width: 12),
+              _buildSummaryCard(
+                label: 'Bulan Ini (${_getMonthName(now.month)})',
+                value: 'Rp${_formatAmount(currentMonthly)}',
+                total: currentMonthly,
+                budget: widget.monthlyLimit,
                 icon: Icons.calendar_month_rounded,
                 accent: currentMonthly >= widget.monthlyLimit
                     ? AppColors.pink
