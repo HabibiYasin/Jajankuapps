@@ -9,9 +9,11 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 
 import 'models/transaction_model.dart';
 import 'services/ocr_service.dart';
-import 'services/database_helper.dart';
+import 'services/account_data_service.dart';
+import 'services/budget_notification_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/scanner_screen.dart';
+import 'screens/manual_expense_screen.dart';
 import 'screens/personalization_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -44,19 +46,21 @@ class QrisTrackerApp extends StatefulWidget {
   State<QrisTrackerApp> createState() => _QrisTrackerAppState();
 }
 
-class _QrisTrackerAppState extends State<QrisTrackerApp> {
+class _QrisTrackerAppState extends State<QrisTrackerApp>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
-  final String _userName = "Habibi Yasin";
-  final String _userRole = "QA Engineer";
-  final double _dailyBudgetLimit = 50000.0;
-  final double _weeklyBudgetLimit = 350000.0;
-  final double _monthlyBudgetLimit = 1500000.0;
+  final String _userName = "Guest";
+  final _accountData = AccountDataService.instance;
+  String? _visibleUid;
+  double get _dailyBudgetLimit => _accountData.limits.daily;
+  double get _weeklyBudgetLimit => _accountData.limits.weekly;
+  double get _monthlyBudgetLimit => _accountData.limits.monthly;
 
   File? _imageFile;
   List<TransactionModel> _transactionHistory = [];
   final _picker = ImagePicker();
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   String _rawDebugText = "";
 
@@ -65,7 +69,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
   @override
   void initState() {
     super.initState();
-    _loadTransactionsFromDB();
+    WidgetsBinding.instance.addObserver(this);
+    _accountData.addListener(_applyAccountData);
+    _accountData.start();
 
     _intentDataStreamSubscription = ReceiveSharingIntent.instance
         .getMediaStream()
@@ -92,19 +98,41 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _accountData.removeListener(_applyAccountData);
     _intentDataStreamSubscription.cancel();
     super.dispose();
   }
 
   Future<void> _loadTransactionsFromDB() async {
-    final data = await DatabaseHelper.instance.fetchTransactions();
+    await _accountData.refreshGuest();
+    _applyAccountData();
+  }
+
+  void _applyAccountData() {
+    if (!mounted) return;
     setState(() {
-      _transactionHistory = data;
-      _isLoading = false;
+      if (_visibleUid != _accountData.uid) {
+        _visibleUid = _accountData.uid;
+        _imageFile = null;
+        _rawDebugText = '';
+      }
+      _transactionHistory = _accountData.history;
     });
+    unawaited(
+      BudgetNotificationService.sync(_transactionHistory, _dailyBudgetLimit),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadTransactionsFromDB();
+    }
   }
 
   Future<void> _processSharedImageFile(File imageFile) async {
+    final owner = _accountData.uid;
     try {
       setState(() {
         _isLoading = true;
@@ -117,6 +145,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       final RecognizedText recognizedText = await textRecognizer.processImage(
         inputImage,
       );
+      await textRecognizer.close();
+      if (!mounted || owner != _accountData.uid) return;
       final spatialText = OcrService.extractSpatialText(recognizedText);
 
       setState(() {
@@ -125,13 +155,17 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
             : "Tidak ada teks yang terdeteksi.";
       });
 
-      await textRecognizer.close();
-
       final tx = await OcrService.processImage(imageFile);
+      if (tx.numericNominal <= 0 || !tx.numericNominal.isFinite) {
+        throw const FormatException(
+          'Nominal tidak terbaca. Coba gambar yang lebih jelas atau Catat Manual.',
+        );
+      }
 
-      await DatabaseHelper.instance.insertTransaction(tx);
+      await _accountData.insert(tx, expectedUid: owner);
       await _loadTransactionsFromDB();
 
+      if (!mounted) return;
       setState(() {
         _imageFile = imageFile;
         _selectedIndex = 1;
@@ -139,7 +173,17 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
       });
 
       _checkDailyBudget();
+      if (tx.category == 'Umum' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Kategori belum pasti. Pilih kategori melalui Dashboard → Edit Detail.',
+            ),
+          ),
+        );
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _rawDebugText = "Gagal memproses OCR: $e";
@@ -148,13 +192,60 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("Gagal memproses file: $e")));
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _processImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile == null) return;
-    await _processSharedImageFile(File(pickedFile.path));
+  Future<void> _processImage(ImageSource source) async {
+    try {
+      final pickedFile = await _picker.pickImage(source: source);
+      if (pickedFile == null || !mounted) return;
+      await _processSharedImageFile(File(pickedFile.path));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal membuka kamera atau galeri: $error')),
+      );
+    }
+  }
+
+  Future<void> _recordManualExpense() async {
+    final owner = _accountData.uid;
+    final tx = await Navigator.of(context).push<TransactionModel>(
+      MaterialPageRoute(builder: (_) => const ManualExpenseScreen()),
+    );
+    if (tx == null || !mounted || owner != _accountData.uid) return;
+    setState(() => _isLoading = true);
+    try {
+      await _accountData.insert(tx, expectedUid: owner);
+      await _loadTransactionsFromDB();
+      if (!mounted || owner != _accountData.uid) return;
+      setState(() => _selectedIndex = 0);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pengeluaran berhasil disimpan.')),
+      );
+      _checkDailyBudget();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan pengeluaran: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _performEdit(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Perubahan gagal: $error')));
+      }
+    }
   }
 
   void _checkDailyBudget() {
@@ -237,34 +328,26 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
         index: _selectedIndex,
         children: [
           DashboardScreen(
+            key: ValueKey(_accountData.uid),
             history: _transactionHistory,
             dailyLimit: _dailyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
-            onDelete: (index) async {
-              await DatabaseHelper.instance.deleteTransaction(
-                _transactionHistory[index],
-              );
-              await _loadTransactionsFromDB();
-            },
-            onUpdateDate: (index, newDate) async {
-              final tx = _transactionHistory[index];
-              await DatabaseHelper.instance.updateTransactionDate(tx, newDate);
-              await _loadTransactionsFromDB();
-            },
+            onDelete: (tx) => _performEdit(() => _accountData.delete(tx)),
+            onUpdateDate: (tx, newDate) =>
+                _performEdit(() => _accountData.updateDate(tx, newDate)),
             // Callback pembaruan transaksi yang baru ditambahkan
-            onUpdateTransaction: (updatedTx) async {
-              await DatabaseHelper.instance.updateTransactionFull(updatedTx);
-              await _loadTransactionsFromDB();
-            },
+            onUpdateTransaction: (tx) =>
+                _performEdit(() => _accountData.updateDetails(tx)),
           ),
           ScannerScreen(
-            onProcessImage: _processImage,
+            onProcessImage: () => _processImage(ImageSource.gallery),
+            onTakePhoto: () => _processImage(ImageSource.camera),
+            onManualEntry: _recordManualExpense,
             imageFile: _imageFile,
             rawTextDebug: _rawDebugText,
           ),
           PersonalizationScreen(
             userName: _userName,
-            userRole: _userRole,
             dailyLimit: _dailyBudgetLimit,
             weeklyLimit: _weeklyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
@@ -301,12 +384,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp> {
                 label: 'Dashboard',
               ),
               NavigationDestination(
-                icon: Icon(Icons.document_scanner_outlined),
-                selectedIcon: Icon(
-                  Icons.document_scanner,
-                  color: AppColors.pink,
-                ),
-                label: 'Scan Struk',
+                icon: Icon(Icons.add_circle_outline),
+                selectedIcon: Icon(Icons.add_circle, color: AppColors.pink),
+                label: 'Catat Pengeluaran',
               ),
               NavigationDestination(
                 icon: Icon(Icons.tune_rounded),

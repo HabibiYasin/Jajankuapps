@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owns(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function validTransaction() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['merchant', 'nominalStr', 'dateTime', 'category', 'source', 'numericNominal'])
+        && d.keys().hasOnly(['merchant', 'nominalStr', 'dateTime', 'category', 'source', 'numericNominal'])
+        && d.merchant is string && d.merchant.size() <= 2000
+        && d.nominalStr is string && d.nominalStr.size() <= 200
+        && d.dateTime is timestamp
+        && d.category is string && d.category.size() <= 200
+        && d.source is string && d.source.size() <= 200
+        && d.numericNominal is number && d.numericNominal >= 0 && d.numericNominal <= 1000000000000000;
+    }
+    function positiveAmount(value) {
+      return value is number && value > 0 && value <= 1000000000000000;
+    }
+    match /users/{uid}/transactions/{id} {
+      allow read, delete: if owns(uid);
+      allow create, update: if owns(uid) && validTransaction();
+    }
+    match /users/{uid}/settings/budget {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasAll(['daily', 'weekly', 'monthly'])
+        && request.resource.data.keys().hasOnly(['daily', 'weekly', 'monthly'])
+        && positiveAmount(request.resource.data.daily)
+        && positiveAmount(request.resource.data.weekly)
+        && positiveAmount(request.resource.data.monthly);
+    }
+    match /users/{uid}/imports/{id} {
+      allow read: if owns(uid);
+      allow create: if owns(uid)
+        && request.resource.data.keys().hasOnly(['completed'])
+        && request.resource.data.completed == true;
+    }
+  }
+}

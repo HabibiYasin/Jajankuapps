@@ -1,4 +1,6 @@
 class TransactionModel {
+  final String? cloudId;
+  final String? ownerUid;
   int? id; // Tambahkan ID untuk referensi ke database
   String merchant;
   String nominalStr;
@@ -8,6 +10,8 @@ class TransactionModel {
   double numericNominal;
 
   TransactionModel({
+    this.cloudId,
+    this.ownerUid,
     this.id,
     required this.merchant,
     required this.nominalStr,

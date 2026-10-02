@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/transaction_model.dart';
+import '../services/transaction_classifier.dart';
 import 'top_categories_widget.dart';
 import '../services/export_service.dart';
 import '../widgets/tutorial_dialog.dart';
@@ -11,8 +12,8 @@ class DashboardScreen extends StatefulWidget {
   final List<TransactionModel> history;
   final double dailyLimit;
   final double monthlyLimit;
-  final Function(int) onDelete;
-  final Function(int, DateTime) onUpdateDate;
+  final Function(TransactionModel) onDelete;
+  final Function(TransactionModel, DateTime) onUpdateDate;
   final Function(TransactionModel) onUpdateTransaction;
 
   const DashboardScreen({
@@ -267,16 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final sourceController = TextEditingController(text: tx.source);
     String selectedCategory = tx.category;
 
-    final List<String> availableCategories = [
-      'Makanan',
-      'Minuman',
-      'Jajan',
-      'Belanja',
-      'Tagihan & Pulsa',
-      'Lifestyle',
-      'Transportasi',
-      'Umum',
-    ];
+    final availableCategories = TransactionClassifier.categories;
 
     if (!availableCategories.contains(selectedCategory)) {
       selectedCategory = 'Umum';
@@ -345,6 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                         isDense: true,
+                        helperText: 'Sesuaikan kategori dengan pembelian.',
                       ),
                       items: availableCategories
                           .map(
@@ -395,6 +388,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showTransactionDetailModal(BuildContext context, int index) {
+    final tx = widget.history[index];
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -403,7 +397,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            final tx = widget.history[index];
             return Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
@@ -466,7 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               if (!context.mounted) return;
                               if (pickedTime != null) {
                                 widget.onUpdateDate(
-                                  index,
+                                  tx,
                                   DateTime(
                                     pickedDate.year,
                                     pickedDate.month,
@@ -512,7 +505,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: const Icon(Icons.delete),
                       label: const Text('Hapus Riwayat Ini'),
                       onPressed: () {
-                        widget.onDelete(index);
+                        widget.onDelete(tx);
                         Navigator.pop(context);
                       },
                     ),
@@ -649,39 +642,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children:
-                  [
-                    'Semua',
-                    'Makanan',
-                    'Minuman',
-                    'Jajan',
-                    'Belanja',
-                    'Tagihan & Pulsa',
-                    'Lifestyle',
-                    'Transportasi',
-                  ].map((category) {
-                    bool isSelected = _selectedCategory == category;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: ChoiceChip(
-                        label: Text(category),
-                        selected: isSelected,
-                        selectedColor: Colors.teal,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                        backgroundColor: Colors.grey.shade100,
-                        onSelected: (selected) {
-                          setState(() {
-                            _selectedCategory = category;
-                          });
-                        },
-                      ),
-                    );
-                  }).toList(),
+              children: ['Semua', ...TransactionClassifier.categories].map((
+                category,
+              ) {
+                bool isSelected = _selectedCategory == category;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text(category),
+                    selected: isSelected,
+                    selectedColor: Colors.teal,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : Colors.black87,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    backgroundColor: Colors.grey.shade100,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedCategory = category;
+                      });
+                    },
+                  ),
+                );
+              }).toList(),
             ),
           ),
           const SizedBox(height: 12),

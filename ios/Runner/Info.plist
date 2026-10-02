@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Ambil foto struk untuk mencatat pengeluaran otomatis.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pilih screenshot atau gambar struk untuk mencatat pengeluaran.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

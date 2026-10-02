@@ -12,7 +12,20 @@
           "package_name": "com.jajanku.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "502729548871-47vnldjm76td6r8ecldmpcn5dbqnlobu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jajanku.app",
+            "certificate_hash": "cef2006b3458f750db6646e1e2a0942fa6c9fb14"
+          }
+        },
+        {
+          "client_id": "502729548871-b9i6dsg4bjbadm00jat3f6uon482b4b4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCX8l2wmrva3z0gDdahxXNK-kh8G2N6FlU"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "502729548871-b9i6dsg4bjbadm00jat3f6uon482b4b4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "502729548871-n4fv8un5uq8q7mt9d5i37qlcj22lpr6j.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.flutterApplication1"
+              }
+            }
+          ]
         }
       }
     }

@@ -48,7 +48,7 @@ Qagos Hubungi Tanya Jago 24/7
     expect(transaction.nominalStr, 'Rp2.000');
     expect(transaction.numericNominal, 2000);
     expect(transaction.dateTime, DateTime(2026, 9, 2, 13, 59));
-    expect(transaction.category, 'Belanja');
+    expect(transaction.category, 'Umum'); // Merchant tanpa sinyal kategori.
   });
 
   test('Biaya dan Gratis pada baris berbeda tidak menjadi merchant', () {

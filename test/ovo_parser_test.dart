@@ -35,7 +35,7 @@ Tutup
     expect(transaction.nominalStr, 'Rp2.000');
     expect(transaction.numericNominal, 2000);
     expect(transaction.dateTime, DateTime(2026, 9, 1, 9, 55));
-    expect(transaction.category, 'Belanja');
+    expect(transaction.category, 'Umum'); // Merchant tanpa sinyal kategori.
   });
 
   test('mendukung nominal yang terpisah dari label', () {

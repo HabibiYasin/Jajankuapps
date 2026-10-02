@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
 import '../models/transaction_model.dart';
 
 class DatabaseHelper {
@@ -16,14 +17,15 @@ class DatabaseHelper {
 
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
-    const int dbVersion = 2; // Naikkan versi ke 2 untuk menambahkan kolom 'source'
+    const int dbVersion = 3;
     final path = join(dbPath, filePath);
 
     return await openDatabase(
-      path, 
-      version: dbVersion, 
+      path,
+      version: dbVersion,
       onCreate: _createDB,
-      onUpgrade: _upgradeDB, // Menangani penambahan kolom tanpa merusak data lama
+      onUpgrade:
+          _upgradeDB, // Menangani penambahan kolom tanpa merusak data lama
     );
   }
 
@@ -39,12 +41,22 @@ class DatabaseHelper {
         numericNominal REAL
       )
     ''');
+    await _createMigrationTable(db);
   }
+
+  Future<void> _createMigrationTable(Database db) => db.execute('''
+    CREATE TABLE cloud_imports (
+      localId INTEGER PRIMARY KEY, uid TEXT NOT NULL, cloudId TEXT NOT NULL
+    )
+  ''');
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'QRIS Umum'");
+      await db.execute(
+        "ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'QRIS Umum'",
+      );
     }
+    if (oldVersion < 3) await _createMigrationTable(db);
   }
 
   // CREATE: Simpan Transaksi Baru
@@ -63,21 +75,70 @@ class DatabaseHelper {
   // READ: Ambil Semua Riwayat Transaksi
   Future<List<TransactionModel>> fetchTransactions() async {
     final db = await instance.database;
-    final result = await db.query('transactions', orderBy: 'dateTime DESC');
+    final result = await db.query(
+      'transactions',
+      where: 'id NOT IN (SELECT localId FROM cloud_imports)',
+      orderBy: 'dateTime DESC',
+    );
 
-    return result.map((json) => TransactionModel(
-      id: json['id'] as int?,
-      merchant: json['merchant'] as String,
-      nominalStr: json['nominalStr'] as String,
-      dateTime: DateTime.parse(json['dateTime'] as String),
-      category: json['category'] as String,
-      source: (json['source'] as String?) ?? 'QRIS Umum',
-      numericNominal: json['numericNominal'] as double,
-    )).toList();
+    return result
+        .map(
+          (json) => TransactionModel(
+            id: json['id'] as int?,
+            merchant: json['merchant'] as String,
+            nominalStr: json['nominalStr'] as String,
+            dateTime: DateTime.parse(json['dateTime'] as String),
+            category: json['category'] as String,
+            source: (json['source'] as String?) ?? 'QRIS Umum',
+            numericNominal: json['numericNominal'] as double,
+          ),
+        )
+        .toList();
   }
 
-  // UPDATE: Ubah Tanggal Transaksi 
-  Future<int> updateTransactionDate(TransactionModel tx, DateTime newDate) async {
+  // Claims survive crashes and reserve a local row for exactly one account.
+  Future<List<Map<String, Object?>>> importCandidates(String uid) async {
+    final db = await database;
+    return db.rawQuery(
+      '''
+      SELECT t.*, c.cloudId FROM transactions t
+      LEFT JOIN cloud_imports c ON t.id = c.localId
+      WHERE c.uid IS NULL OR c.uid = ?
+    ''',
+      [uid],
+    );
+  }
+
+  Future<String> claimImport(int localId, String uid, String cloudId) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      await txn.insert('cloud_imports', {
+        'localId': localId,
+        'uid': uid,
+        'cloudId': cloudId,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      final row = (await txn.query(
+        'cloud_imports',
+        where: 'localId = ?',
+        whereArgs: [localId],
+      )).single;
+      if (row['uid'] != uid) {
+        throw StateError('Transaksi sudah dipilih akun lain');
+      }
+      return row['cloudId'] as String;
+    });
+  }
+
+  Future<void> finishImport(int localId) async {
+    final db = await database;
+    await db.delete('transactions', where: 'id = ?', whereArgs: [localId]);
+  }
+
+  // UPDATE: Ubah Tanggal Transaksi
+  Future<int> updateTransactionDate(
+    TransactionModel tx,
+    DateTime newDate,
+  ) async {
     final db = await instance.database;
     return await db.update(
       'transactions',
@@ -92,11 +153,7 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.update(
       'transactions',
-      {
-        'merchant': tx.merchant,
-        'category': tx.category,
-        'source': tx.source, 
-      },
+      {'merchant': tx.merchant, 'category': tx.category, 'source': tx.source},
       where: 'id = ?',
       whereArgs: [tx.id],
     );
@@ -105,10 +162,6 @@ class DatabaseHelper {
   // DELETE: Hapus Transaksi
   Future<int> deleteTransaction(TransactionModel tx) async {
     final db = await instance.database;
-    return await db.delete(
-      'transactions',
-      where: 'id = ?',
-      whereArgs: [tx.id],
-    );
+    return await db.delete('transactions', where: 'id = ?', whereArgs: [tx.id]);
   }
 }

@@ -1,4 +1,5 @@
 import '../models/transaction_model.dart';
+import 'transaction_classifier.dart';
 import 'parsers/shopeepay_parser.dart';
 import 'parsers/dana_parser.dart';
 import 'parsers/bca_parser.dart';
@@ -11,8 +12,20 @@ import 'parsers/jago_syariah_parser.dart';
 
 class QrisParser {
   static TransactionModel parseReceipt(String rawText) {
+    final transaction = _parseReceipt(rawText);
+    transaction.category = TransactionClassifier.classify(
+      merchant: transaction.merchant,
+      receiptText: rawText,
+    ).category;
+    return transaction;
+  }
+
+  static TransactionModel _parseReceipt(String rawText) {
     List<String> lines = rawText.split('\n');
-    List<String> cleanedLines = lines.map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    List<String> cleanedLines = lines
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
 
     // ROUTER BERBASIS APLIKASI
     if (ShopeePayParser.isMatch(rawText)) {
@@ -25,14 +38,18 @@ class QrisParser {
       return DanaParser.parse(rawText, cleanedLines);
     } else if (BcaParser.isMatch(rawText)) {
       return BcaParser.parse(rawText, cleanedLines);
-    } else if (BcaSyariahParser.isMatch(rawText)) {
+    } else if (rawText.toLowerCase().contains('bca syariah')) {
       return BcaSyariahParser.parse(rawText, cleanedLines);
     } else if (BriParser.isMatch(rawText)) {
       return BriParser.parse(rawText, cleanedLines);
     } else if (MandiriParser.isMatch(rawText)) {
       return MandiriParser.parse(rawText, cleanedLines);
-    } else if (GopayParser.isMatch(rawText)) { // <-- Tambahkan routing GoPay di sini
+    } else if (GopayParser.isMatch(rawText)) {
+      // <-- Tambahkan routing GoPay di sini
       return GopayParser.parse(rawText, cleanedLines);
+    } else if (BcaSyariahParser.isMatch(rawText)) {
+      // Its generic layout fallback must follow explicit bank/app signatures.
+      return BcaSyariahParser.parse(rawText, cleanedLines);
     }
 
     // Fallback jika belum terdaftar

@@ -1,25 +1,39 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/auth_service.dart';
+import '../services/account_data_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tutorial_dialog.dart';
 import 'budget_settings_screen.dart';
 
+enum UserTier {
+  guest('Jajaners CobaCoba'),
+  free('Jajaners Gratisan'),
+  premium('Jajaners VIP');
+
+  const UserTier(this.label);
+
+  final String label;
+}
+
 class PersonalizationScreen extends StatefulWidget {
   final String userName;
-  final String userRole;
   final double dailyLimit;
   final double weeklyLimit;
   final double monthlyLimit;
+  final UserTier loggedInTier;
 
   const PersonalizationScreen({
     super.key,
     required this.userName,
-    required this.userRole,
     required this.dailyLimit,
     required this.weeklyLimit,
     required this.monthlyLimit,
+    this.loggedInTier = UserTier.free,
   });
 
   @override
@@ -28,6 +42,88 @@ class PersonalizationScreen extends StatefulWidget {
 
 class _PersonalizationScreenState extends State<PersonalizationScreen> {
   bool _loading = false;
+  String? _savedName;
+  StreamSubscription<User?>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = AuthService.instance;
+    if (auth.isConfigured) {
+      _loadSavedName(auth.currentUser);
+      _authSubscription = auth.authStateChanges.listen(_loadSavedName);
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  String _nameKey(String uid) => 'profile_name_$uid';
+
+  Future<void> _loadSavedName(User? user) async {
+    if (mounted) setState(() => _savedName = null);
+    String? savedName;
+    if (user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      savedName = prefs.getString(_nameKey(user.uid));
+    }
+    if (mounted && AuthService.instance.currentUser?.uid == user?.uid) {
+      setState(() => _savedName = savedName);
+    }
+  }
+
+  Future<void> _editName(User user) async {
+    final controller = TextEditingController(
+      text: _savedName ?? user.displayName ?? '',
+    );
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit nama'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 50,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Nama',
+            hintText: 'Masukkan nama yang ingin ditampilkan',
+          ),
+          onSubmitted: (value) {
+            final name = value.trim();
+            if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null || !mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_nameKey(user.uid), newName);
+    if (mounted) {
+      setState(() => _savedName = newName);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Nama berhasil disimpan')));
+    }
+  }
 
   Future<void> _signIn() async {
     setState(() => _loading = true);
@@ -45,14 +141,129 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
   Future<void> _signOut() async {
     setState(() => _loading = true);
     try {
+      await AccountDataService.instance.beforeSignOut();
       await AuthService.instance.signOut();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Belum bisa keluar: $error')));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _importLocal() async {
+    final data = AccountDataService.instance;
+    final owner = data.uid;
+    if (owner == null) return;
+    setState(() => _loading = true);
+    try {
+      final count = await data.importCount();
+      if (!mounted || data.uid != owner) return;
+      if (count == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tidak ada transaksi lokal untuk dipindahkan.'),
+          ),
+        );
+        return;
+      }
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Pindahkan transaksi lokal?'),
+          content: Text(
+            '$count transaksi dari HP ini akan dipindahkan ke akun '
+            '${AuthService.instance.currentUser?.email ?? ''}. '
+            'Setelah tersimpan di cloud, transaksi tersebut tidak lagi tampil di Guest. '
+            'Pemindahan memerlukan internet.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Pindahkan'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      final moved = await data.importGuest(owner);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$moved transaksi berhasil dipindahkan ke cloud.'),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Pemindahan belum selesai. Periksa internet dan coba lagi dengan akun yang sama.',
+            ),
+          ),
+        );
+      }
+      debugPrint('Import transaksi: $error');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Widget _syncCard() => ListenableBuilder(
+    listenable: AccountDataService.instance,
+    builder: (context, _) {
+      final data = AccountDataService.instance;
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    data.uid == null
+                        ? Icons.phone_android
+                        : Icons.cloud_outlined,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(data.status)),
+                ],
+              ),
+              if (data.error != null)
+                TextButton(
+                  onPressed: () => data.retry(),
+                  child: const Text('Coba sinkronkan lagi'),
+                ),
+              if (data.uid != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _loading || data.importing ? null : _importLocal,
+                  icon: const Icon(Icons.cloud_upload_outlined),
+                  label: Text(
+                    data.importing
+                        ? 'Memindahkan…'
+                        : 'Pindahkan transaksi dari HP ini',
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
   Widget _profile(User? user) {
     final photoUrl = user?.photoURL;
+    final tier = user == null ? UserTier.guest : widget.loggedInTier;
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -80,7 +291,9 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
               : null,
         ),
         title: Text(
-          user?.displayName ?? widget.userName,
+          user == null
+              ? widget.userName
+              : (_savedName ?? user.displayName ?? widget.userName),
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -88,9 +301,17 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           ),
         ),
         subtitle: Text(
-          user?.email ?? widget.userRole,
+          tier.label,
           style: const TextStyle(color: AppColors.mist),
         ),
+        trailing: user == null
+            ? null
+            : IconButton(
+                tooltip: 'Edit nama',
+                onPressed: () => _editName(user),
+                icon: const Icon(Icons.edit_rounded, color: Colors.white),
+              ),
+        onTap: user == null ? null : () => _editName(user),
       ),
     );
   }
@@ -161,6 +382,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           const SizedBox(height: 12),
           Text('Akun', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
+          _syncCard(),
           if (!auth.isConfigured)
             Card(
               child: Padding(
