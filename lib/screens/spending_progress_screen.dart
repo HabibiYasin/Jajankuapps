@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/spending_progress.dart';
 import '../services/spending_card_renderer.dart';
+import '../services/auth_service.dart';
 
 class SpendingProgressScreen extends StatefulWidget {
   final SpendingProgress progress;
@@ -20,7 +22,21 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
   @override
   void initState() {
     super.initState();
-    _image = SpendingCardRenderer.render(widget.progress);
+    _image = _renderImage();
+  }
+
+  Future<Uint8List> _renderImage() async {
+    final user = AuthService.instance.currentUser;
+    final prefs = await SharedPreferences.getInstance();
+    final savedName = prefs.getString(
+      user == null ? 'guest_profile_name' : 'profile_name_${user.uid}',
+    );
+    final name = [
+      savedName,
+      user?.displayName,
+      'Jajaners',
+    ].whereType<String>().firstWhere((value) => value.trim().isNotEmpty).trim();
+    return SpendingCardRenderer.render(widget.progress, username: name);
   }
 
   Future<void> _export(Uint8List bytes, {required bool share}) async {
@@ -80,7 +96,7 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
           return Center(
             child: TextButton(
               onPressed: () => setState(() {
-                _image = SpendingCardRenderer.render(widget.progress);
+                _image = _renderImage();
               }),
               child: const Text('Gagal membuat gambar. Coba lagi'),
             ),
