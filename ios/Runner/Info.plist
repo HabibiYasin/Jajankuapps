@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Ambil foto struk untuk mencatat pengeluaran otomatis.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Simpan gambar progres pengeluaran Jajanku ke galeri.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pilih screenshot atau gambar struk untuk mencatat pengeluaran.</string>
 	<key>UIApplicationSceneManifest</key>

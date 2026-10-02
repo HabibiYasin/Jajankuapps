@@ -5,6 +5,8 @@ import '../models/transaction_model.dart';
 import 'top_categories_widget.dart';
 import '../widgets/tutorial_dialog.dart';
 import '../theme/app_theme.dart';
+import '../models/spending_progress.dart';
+import 'spending_progress_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final List<TransactionModel> history;
@@ -130,66 +132,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required double budget,
     required IconData icon,
     required Color accent,
+    required DateTime periodDate,
+    bool monthly = false,
   }) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.07),
-              blurRadius: 18,
-              offset: const Offset(0, 7),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, size: 20, color: accent),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 3),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: const TextStyle(
-                  color: AppColors.charcoal,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+      child: Semantics(
+        button: true,
+        label: 'Lihat dan bagikan progres $label',
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SpendingProgressScreen(
+                progress: SpendingProgress(
+                  period: monthly
+                      ? (label.startsWith('Bulan Kemarin')
+                            ? 'Bulan Kemarin'
+                            : 'Bulan Ini')
+                      : label,
+                  date: periodDate,
+                  monthly: monthly,
+                  spent: total,
+                  budget: budget,
                 ),
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Maks. budget: Rp${_formatAmount(budget)}',
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.charcoal.withValues(alpha: 0.07),
+                  blurRadius: 18,
+                  offset: const Offset(0, 7),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: budget > 0 ? (total / budget).clamp(0.0, 1.0) : 0.0,
-                minHeight: 6,
-                backgroundColor: AppColors.mist.withValues(alpha: 0.3),
-                color: accent,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, size: 20, color: accent),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  label,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      color: AppColors.charcoal,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Maks. budget: Rp${_formatAmount(budget)}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Ketuk untuk bagikan',
+                  style: TextStyle(fontSize: 10, color: AppColors.teal),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: budget > 0 ? (total / budget).clamp(0.0, 1.0) : 0.0,
+                    minHeight: 6,
+                    backgroundColor: AppColors.mist.withValues(alpha: 0.3),
+                    color: accent,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -271,6 +303,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _buildSummaryCard(
                 label: 'Hari Ini',
+                periodDate: now,
                 value: 'Rp${_formatAmount(currentDaily)}',
                 total: currentDaily,
                 budget: widget.dailyLimit,
@@ -282,6 +315,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(width: 12),
               _buildSummaryCard(
                 label: 'Kemarin',
+                periodDate: yesterday,
                 value: 'Rp${_formatAmount(yesterdayTotal)}',
                 total: yesterdayTotal,
                 budget: widget.dailyLimit,
@@ -297,6 +331,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _buildSummaryCard(
                 label: 'Bulan Kemarin (${_getMonthName(lastMonth.month)})',
+                periodDate: lastMonth,
+                monthly: true,
                 value: 'Rp${_formatAmount(lastMonthly)}',
                 total: lastMonthly,
                 budget: widget.monthlyLimit,
@@ -308,6 +344,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(width: 12),
               _buildSummaryCard(
                 label: 'Bulan Ini (${_getMonthName(now.month)})',
+                periodDate: now,
+                monthly: true,
                 value: 'Rp${_formatAmount(currentMonthly)}',
                 total: currentMonthly,
                 budget: widget.monthlyLimit,
