@@ -43,14 +43,15 @@ class PersonalizationScreen extends StatefulWidget {
 class _PersonalizationScreenState extends State<PersonalizationScreen> {
   bool _loading = false;
   String? _savedName;
+  int _nameGeneration = 0;
   StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     final auth = AuthService.instance;
+    _loadSavedName(auth.currentUser);
     if (auth.isConfigured) {
-      _loadSavedName(auth.currentUser);
       _authSubscription = auth.authStateChanges.listen(_loadSavedName);
     }
   }
@@ -61,41 +62,53 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
     super.dispose();
   }
 
-  String _nameKey(String uid) => 'profile_name_$uid';
+  String _nameKey(String? uid) =>
+      uid == null ? 'guest_profile_name' : 'profile_name_$uid';
 
   Future<void> _loadSavedName(User? user) async {
+    final generation = ++_nameGeneration;
     if (mounted) setState(() => _savedName = null);
-    String? savedName;
-    if (user != null) {
+    try {
       final prefs = await SharedPreferences.getInstance();
-      savedName = prefs.getString(_nameKey(user.uid));
-    }
-    if (mounted && AuthService.instance.currentUser?.uid == user?.uid) {
-      setState(() => _savedName = savedName);
+      final savedName = prefs.getString(_nameKey(user?.uid));
+      if (mounted &&
+          generation == _nameGeneration &&
+          AuthService.instance.currentUser?.uid == user?.uid) {
+        setState(() => _savedName = savedName);
+      }
+    } catch (error) {
+      debugPrint('Gagal memuat nama: $error');
     }
   }
 
-  Future<void> _editName(User user) async {
-    final controller = TextEditingController(
-      text: _savedName ?? user.displayName ?? '',
-    );
+  Future<void> _editName(User? user) async {
+    final formKey = GlobalKey<FormState>();
+    var nameInput = _savedName ?? user?.displayName ?? widget.userName;
     final newName = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Edit nama'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 50,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Nama',
-            hintText: 'Masukkan nama yang ingin ditampilkan',
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            initialValue: nameInput,
+            onChanged: (value) => nameInput = value,
+            autofocus: true,
+            maxLength: 50,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Nama',
+              hintText: 'Masukkan nama yang ingin ditampilkan',
+            ),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Nama tidak boleh kosong.'
+                : null,
+            onFieldSubmitted: (value) {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, value.trim());
+              }
+            },
           ),
-          onSubmitted: (value) {
-            final name = value.trim();
-            if (name.isNotEmpty) Navigator.pop(dialogContext, name);
-          },
         ),
         actions: [
           TextButton(
@@ -104,24 +117,37 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, nameInput.trim());
+              }
             },
             child: const Text('Simpan'),
           ),
         ],
       ),
     );
-    controller.dispose();
     if (newName == null || !mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_nameKey(user.uid), newName);
-    if (mounted) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted || AuthService.instance.currentUser?.uid != user?.uid) {
+        return;
+      }
+      final saved = await prefs.setString(_nameKey(user?.uid), newName);
+      if (!saved) throw StateError('Penyimpanan nama gagal.');
+      if (!mounted || AuthService.instance.currentUser?.uid != user?.uid) {
+        return;
+      }
+      ++_nameGeneration;
       setState(() => _savedName = newName);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Nama berhasil disimpan')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama gagal disimpan. Coba lagi.')),
+      );
     }
   }
 
@@ -291,9 +317,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
               : null,
         ),
         title: Text(
-          user == null
-              ? widget.userName
-              : (_savedName ?? user.displayName ?? widget.userName),
+          _savedName ?? user?.displayName ?? widget.userName,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -304,14 +328,12 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           tier.label,
           style: const TextStyle(color: AppColors.mist),
         ),
-        trailing: user == null
-            ? null
-            : IconButton(
-                tooltip: 'Edit nama',
-                onPressed: () => _editName(user),
-                icon: const Icon(Icons.edit_rounded, color: Colors.white),
-              ),
-        onTap: user == null ? null : () => _editName(user),
+        trailing: IconButton(
+          tooltip: 'Edit nama',
+          onPressed: _loading ? null : () => _editName(user),
+          icon: const Icon(Icons.edit_rounded, color: Colors.white),
+        ),
+        onTap: _loading ? null : () => _editName(user),
       ),
     );
   }

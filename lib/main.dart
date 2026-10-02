@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'models/transaction_model.dart';
 import 'services/ocr_service.dart';
 import 'services/account_data_service.dart';
 import 'services/budget_notification_service.dart';
 import 'screens/dashboard_screen.dart';
-import 'screens/scanner_screen.dart';
+import 'screens/transaction_history_screen.dart';
+import 'widgets/expense_floating_menu.dart';
 import 'screens/manual_expense_screen.dart';
 import 'screens/personalization_screen.dart';
 import 'theme/app_theme.dart';
@@ -57,12 +57,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   double get _weeklyBudgetLimit => _accountData.limits.weekly;
   double get _monthlyBudgetLimit => _accountData.limits.monthly;
 
-  File? _imageFile;
   List<TransactionModel> _transactionHistory = [];
   final _picker = ImagePicker();
   bool _isLoading = false;
-
-  String _rawDebugText = "";
 
   late StreamSubscription _intentDataStreamSubscription;
 
@@ -114,8 +111,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     setState(() {
       if (_visibleUid != _accountData.uid) {
         _visibleUid = _accountData.uid;
-        _imageFile = null;
-        _rawDebugText = '';
       }
       _transactionHistory = _accountData.history;
     });
@@ -138,23 +133,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         _isLoading = true;
       });
 
-      final inputImage = InputImage.fromFile(imageFile);
-      final textRecognizer = TextRecognizer(
-        script: TextRecognitionScript.latin,
-      );
-      final RecognizedText recognizedText = await textRecognizer.processImage(
-        inputImage,
-      );
-      await textRecognizer.close();
-      if (!mounted || owner != _accountData.uid) return;
-      final spatialText = OcrService.extractSpatialText(recognizedText);
-
-      setState(() {
-        _rawDebugText = spatialText.isNotEmpty
-            ? spatialText
-            : "Tidak ada teks yang terdeteksi.";
-      });
-
       final tx = await OcrService.processImage(imageFile);
       if (tx.numericNominal <= 0 || !tx.numericNominal.isFinite) {
         throw const FormatException(
@@ -167,7 +145,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
       if (!mounted) return;
       setState(() {
-        _imageFile = imageFile;
         _selectedIndex = 1;
         _isLoading = false;
       });
@@ -177,7 +154,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Kategori belum pasti. Pilih kategori melalui Dashboard → Edit Detail.',
+              'Kategori belum pasti. Pilih kategori melalui Riwayat → Edit Detail.',
             ),
           ),
         );
@@ -186,7 +163,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _rawDebugText = "Gagal memproses OCR: $e";
       });
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -332,19 +308,15 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
             history: _transactionHistory,
             dailyLimit: _dailyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
+          ),
+          TransactionHistoryScreen(
+            key: ValueKey('history-${_accountData.uid}'),
+            history: _transactionHistory,
             onDelete: (tx) => _performEdit(() => _accountData.delete(tx)),
             onUpdateDate: (tx, newDate) =>
                 _performEdit(() => _accountData.updateDate(tx, newDate)),
-            // Callback pembaruan transaksi yang baru ditambahkan
             onUpdateTransaction: (tx) =>
                 _performEdit(() => _accountData.updateDetails(tx)),
-          ),
-          ScannerScreen(
-            onProcessImage: () => _processImage(ImageSource.gallery),
-            onTakePhoto: () => _processImage(ImageSource.camera),
-            onManualEntry: _recordManualExpense,
-            imageFile: _imageFile,
-            rawTextDebug: _rawDebugText,
           ),
           PersonalizationScreen(
             userName: _userName,
@@ -354,6 +326,13 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
           ),
         ],
       ),
+      floatingActionButton: _selectedIndex == 0
+          ? ExpenseFloatingMenu(
+              onManualEntry: _recordManualExpense,
+              onGallery: () => _processImage(ImageSource.gallery),
+              onCamera: () => _processImage(ImageSource.camera),
+            )
+          : null,
       bottomNavigationBar: SafeArea(
         child: Container(
           margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
@@ -384,9 +363,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
                 label: 'Dashboard',
               ),
               NavigationDestination(
-                icon: Icon(Icons.add_circle_outline),
-                selectedIcon: Icon(Icons.add_circle, color: AppColors.pink),
-                label: 'Catat Pengeluaran',
+                icon: Icon(Icons.receipt_long_outlined),
+                selectedIcon: Icon(Icons.receipt_long, color: AppColors.teal),
+                label: 'Riwayat',
               ),
               NavigationDestination(
                 icon: Icon(Icons.tune_rounded),
