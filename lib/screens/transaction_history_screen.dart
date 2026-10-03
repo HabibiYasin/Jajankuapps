@@ -307,7 +307,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.download),
-              label: const Text('Export Laporan ke CSV / Sheet'),
+              label: const Text('Ekspor Laporan Excel / Sheets'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
@@ -317,7 +317,26 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                 ),
               ),
               onPressed: () async {
-                await ExportService.exportTransactionsToCSV(widget.history);
+                if (widget.history.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Belum ada transaksi untuk diekspor.'),
+                    ),
+                  );
+                  return;
+                }
+                try {
+                  await ExportService.exportTransactionsToExcel(widget.history);
+                } catch (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Gagal mengekspor laporan. Silakan coba lagi.',
+                      ),
+                    ),
+                  );
+                }
               },
             ),
           ),
