@@ -7,6 +7,72 @@ import 'package:flutter_application_1/services/account_data_service.dart';
 import 'package:flutter_application_1/services/transaction_classifier.dart';
 
 void main() {
+  testWidgets(
+    'rejected save keeps the quiz on the budget step with entered values',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore(
+        securityRules: '''
+      service cloud.firestore {
+        match /databases/{database}/documents {
+          match /{document=**} {
+            allow read: if true;
+            allow write: if false;
+          }
+        }
+      }
+    ''',
+      );
+      final data = AccountDataService(
+        firestore: firestore,
+        currentUid: () => 'alice',
+      );
+      addTearDown(data.dispose);
+      await data.switchAccount('alice');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ListenableBuilder(
+            listenable: data,
+            builder: (_, _) => data.limits.isConfigured
+                ? const Scaffold(body: Text('Dashboard siap'))
+                : BudgetSettingsScreen(
+                    onboarding: true,
+                    dailyLimit: 50000,
+                    weeklyLimit: 350000,
+                    monthlyLimit: 1500000,
+                    accountData: data,
+                  ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Jajan aja'));
+      await tester.tap(find.text('Jajan aja'));
+      await tester.pump();
+      await tester.ensureVisible(find.text('Lanjut: atur budget'));
+      await tester.tap(find.text('Lanjut: atur budget'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byType(TextFormField).first);
+      await tester.enterText(find.byType(TextFormField).first, '75000');
+      await tester.ensureVisible(find.text('Mulai pakai Jajanku'));
+      await tester.tap(find.text('Mulai pakai Jajanku'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dashboard siap'), findsNothing);
+      expect(
+        find.text('Berapa budget harian, mingguan, dan bulanan kamu?'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).first)
+            .controller!
+            .text,
+        '75000',
+      );
+      expect(find.textContaining('Budget gagal disimpan'), findsOneWidget);
+      expect(data.limits.isConfigured, false);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('onboarding presets, defaults and save complete account setup', (
     tester,
   ) async {

@@ -16,6 +16,55 @@ TransactionModel sample({double amount = 62500}) => TransactionModel(
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 30));
 
 void main() {
+  test(
+    'denied budget save never completes onboarding and can be retried',
+    () async {
+      final firestore = FakeFirebaseFirestore(
+        securityRules: '''
+      service cloud.firestore {
+        match /databases/{database}/documents {
+          match /{document=**} {
+            allow read: if true;
+            allow write: if request.auth != null;
+          }
+        }
+      }
+    ''',
+      );
+      final data = AccountDataService(
+        firestore: firestore,
+        currentUid: () => 'alice',
+      );
+      addTearDown(data.dispose);
+      await data.switchAccount('alice');
+      await settle();
+      var completed = false;
+      data.addListener(() {
+        completed = completed || data.limits.isConfigured;
+      });
+      const budget = BudgetLimits(
+        daily: 75000,
+        categories: BudgetLimits.snackCategories,
+      );
+      await expectLater(
+        data.saveBudget(budget, expectedUid: 'alice'),
+        throwsA(isA<Exception>()),
+      );
+      await settle();
+      expect(completed, false);
+      expect(data.limits.isConfigured, false);
+      expect(data.pending, false);
+      firestore.authObject.add({'uid': 'alice'});
+      await data.saveBudget(budget, expectedUid: 'alice');
+      await settle();
+      expect(data.limits.isConfigured, true);
+      expect(data.limits.daily, 75000);
+      expect(data.error, isNull);
+      await data.switchAccount('alice');
+      await settle();
+      expect(data.limits.isConfigured, true);
+    },
+  );
   test('transactions and budget stream across devices and stay isolated by account', () async {
     final firestore = FakeFirebaseFirestore();
     var current = 'alice';

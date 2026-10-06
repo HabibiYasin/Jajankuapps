@@ -4,6 +4,7 @@ class SpendingProgress {
   final bool monthly;
   final double spent;
   final double budget;
+  final double? previousSpent;
 
   const SpendingProgress({
     required this.period,
@@ -11,29 +12,52 @@ class SpendingProgress {
     required this.spent,
     required this.budget,
     this.monthly = false,
+    this.previousSpent,
   });
 
   bool get hasBudget => budget.isFinite && budget > 0;
   double get percentage => hasBudget ? spent / budget * 100 : 0;
   String get title {
     if (!hasBudget) return 'Belum Ada Budget';
-    if (percentage == 0) return 'Ambyar';
+    if (percentage == 0) return 'Puasa atau lupa?';
     if (percentage <= 50) return 'Hematers';
     if (percentage <= 75) return 'Strategist';
     if (percentage <= 100) return 'Perfectionist';
-    return 'Duar';
+    return 'Ambyar';
   }
 
-  String get artworkAsset =>
-      'assets/share/${hasBudget ? title.toLowerCase() : 'hematers'}.png';
+  String get artworkKey => !hasBudget
+      ? 'hematers'
+      : percentage == 0
+      ? 'ambyar'
+      : percentage > 100
+      ? 'duar'
+      : title.toLowerCase();
+  String get artworkAsset => 'assets/share/$artworkKey.png';
+
+  String amountLabel({bool hideAmounts = false}) =>
+      hideAmounts ? 'XX / XX' : '${rupiah(spent)} / ${rupiah(budget)}';
+
+  String? get comparison {
+    final previous = previousSpent;
+    if (previous == null || !previous.isFinite || previous < 0) return null;
+    final period = monthly ? 'bulan kemarin' : 'hari kemarin';
+    if (spent == previous) return 'Sama dengan $period';
+    if (previous == 0) {
+      return 'Belum ada pengeluaran $period untuk dibandingkan';
+    }
+    final change = ((spent - previous).abs() / previous * 100);
+    final percent = change < 1 ? '<1' : change.round().toString();
+    return 'Lebih ${spent < previous ? 'hemat' : 'boros'} $percent% dari $period';
+  }
 
   List<String> get messages => switch (title) {
-    'Ambyar' => const [
-      'Nol jajan! Dompet aman, abang cilok kehilangan pelanggan.',
-      'Pengeluaran nol. Kamu lagi hemat atau lupa nyatet, nih?',
-      'Dompet belum disentuh. QRIS sampai nanya: kita masih temenan?',
-      'Jajan belum mulai, dramanya udah Ambyar duluan.',
-      'Nol rupiah keluar. Dompet lagi cuti dari dunia perjajanan.',
+    'Puasa atau lupa?' => const [
+      'Belum ada jajan yang tercatat. Lagi hemat, atau belum sempat nyatet?',
+      'Catatan jajan masih kosong. Kalau tadi sudah jajan, jangan lupa dicatat, ya.',
+      'Belum ada pengeluaran tercatat. Semoga memang belum jajan, bukan lupa nyatet.',
+      'Budget masih utuh di catatan. Coba ingat, tadi sempat beli apa?',
+      'Belum ada jajan di sini. Kalau ada yang terlewat, masih bisa dicatat kok.',
     ],
     'Hematers' => const [
       'Jajan jalan, dompet tetap santai. Hematers turun tangan!',
@@ -56,12 +80,12 @@ class SpendingProgress {
       'Dompet bilang cukup. Kamu bilang: siap, bos!',
       'Presisi level sultan kalkulator. Satu checkout lagi, ceritanya beda.',
     ],
-    'Duar' => const [
-      'Duar! Budget jebol, dompet minta time-out.',
-      'Checkout-nya lancar. Dompetnya yang buffering.',
-      'Budget sudah lewat garis. Yuk, ajak dompet pulang dulu.',
-      'Promo menang ronde ini. Besok kita comeback pakai rem!',
-      'Dompet habis ikut konser checkout. Saatnya istirahat dulu.',
+    'Ambyar' => const [
+      'Wah, jajannya sudah lewat budget. Cek dulu sebelum nambah lagi, ya.',
+      'Ternyata total jajannya sudah lewat batas. Yuk, lihat mana yang paling banyak.',
+      'Budget sudah terlewati. Nggak apa-apa, catat dulu biar tahu habisnya ke mana.',
+      'Jajannya ternyata sudah lewat batas. Yuk, cek catatannya dan atur lagi pelan-pelan.',
+      'Sudah lewat budget, nih. Sebelum jajan lagi, coba lihat totalnya dulu.',
     ],
     _ => const ['Atur budget dulu, biar jajannya punya pagar pembatas.'],
   };

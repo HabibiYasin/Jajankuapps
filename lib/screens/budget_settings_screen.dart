@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -102,18 +105,19 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Perubahan budget diterima. Lihat status sinkronisasi di Personalisasi.',
-          ),
-        ),
+        SnackBar(content: Text('Pengaturan budget berhasil disimpan.')),
       );
       if (!widget.onboarding) Navigator.pop(context);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Budget gagal disimpan: $error')),
-        );
+        final message =
+            error is FirebaseException && error.code == 'permission-denied'
+            ? 'Budget belum tersimpan karena izin penyimpanan akun ditolak. Pilihanmu tetap di sini; coba lagi setelah izin diperbaiki.'
+            : error is TimeoutException
+            ? 'Penyimpanan belum terkonfirmasi. Periksa koneksi internet lalu coba lagi.'
+            : 'Budget gagal disimpan. Pilihanmu tetap di sini; coba lagi.';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

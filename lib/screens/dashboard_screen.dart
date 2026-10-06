@@ -135,6 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color accent,
     required DateTime periodDate,
     bool monthly = false,
+    double? previousSpent,
   }) {
     return Expanded(
       child: Semantics(
@@ -154,6 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   monthly: monthly,
                   spent: total,
                   budget: budget,
+                  previousSpent: previousSpent,
                 ),
               ),
             ),
@@ -205,6 +207,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   'Maks. budget: Rp${_formatAmount(budget)}',
                   style: const TextStyle(color: Colors.grey, fontSize: 11),
                 ),
+                if (previousSpent != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    SpendingProgress(
+                      period: label,
+                      date: periodDate,
+                      spent: total,
+                      budget: budget,
+                      monthly: monthly,
+                      previousSpent: previousSpent,
+                    ).comparison!,
+                    style: const TextStyle(fontSize: 11, color: AppColors.teal),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 const Text(
                   'Ketuk untuk bagikan',
@@ -300,6 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 periodDate: now,
                 value: 'Rp${_formatAmount(currentDaily)}',
                 total: currentDaily,
+                previousSpent: yesterdayTotal,
                 budget: widget.dailyLimit,
                 icon: Icons.today_rounded,
                 accent: currentDaily >= widget.dailyLimit
@@ -342,6 +359,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 monthly: true,
                 value: 'Rp${_formatAmount(currentMonthly)}',
                 total: currentMonthly,
+                previousSpent: lastMonthly,
                 budget: widget.monthlyLimit,
                 icon: Icons.calendar_month_rounded,
                 accent: currentMonthly >= widget.monthlyLimit

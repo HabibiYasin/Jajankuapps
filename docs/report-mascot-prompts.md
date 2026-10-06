@@ -1,0 +1,11 @@
+# Ambyar and Duar report mascot assets
+
+Generated with the built-in imagegen tool, using `assets/mascot/jajanku_mascot.png` as the identity reference. Both outputs have transparent backgrounds.
+
+## Ambyar — assets/share/ambyar_mascot.png
+
+Use case: identity-preserve. Asset type: transparent mascot cutout for Jajanku expense report. Input image is the identity reference: keep the white rounded snack bag character with orange QR symbol, skewered yellow snacks, triangular snack and takeaway brown-lid drink, white arms and legs, orange sneakers. Generate the same character in polished soft 3D illustration style. Full body, isolated centered with comfortable margins, transparent background. Pose: looking thoughtfully at a small blank cream notebook held in one hand, other hand gently scratching its head. A naturally puzzled but friendly expression, relaxed eyebrows, small closed smile. The report means no expenses recorded; no crying, broken wallet, explosion, flames or exaggerated despair. Preserve recognizable character proportions, material, palette, QR mark and snack contents. No text, lettering, numbers, watermark, scenery, panels or card layout. Clean alpha edges, subtle contact shadow only.
+
+## Duar — assets/share/duar_mascot.png
+
+Use case: identity-preserve. Asset type: transparent mascot cutout for Jajanku overspending report. Input image is the identity reference: keep the white rounded snack bag character with orange QR symbol, skewered yellow snacks, triangular snack and takeaway brown-lid drink, white arms and legs, orange sneakers. Generate the same character in polished soft 3D illustration style. Full body, isolated centered with comfortable margins, transparent background. Pose: holding an open small brown wallet and looking at it with mildly surprised expression, slightly raised eyebrows and a small open mouth, one free hand near its cheek. Friendly and relatable, not panicking. Preserve recognizable character proportions, material, palette, QR mark and snack contents. No explosion, flames, flying objects, crying, tears, dramatic lightning, scenery, panels, card layout, text, lettering, numbers or watermark. Clean alpha edges, subtle contact shadow only.

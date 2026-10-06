@@ -20,6 +20,7 @@ class SpendingProgressScreen extends StatefulWidget {
 class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
   late Future<Uint8List> _image;
   bool _busy = false;
+  bool _hideAmounts = false;
   int _messageVariant = Random().nextInt(5);
   @override
   void initState() {
@@ -28,6 +29,8 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
   }
 
   Future<Uint8List> _renderImage() async {
+    final hideAmounts = _hideAmounts;
+    final messageVariant = _messageVariant;
     final user = AuthService.instance.currentUser;
     final prefs = await SharedPreferences.getInstance();
     final savedName = prefs.getString(
@@ -41,7 +44,8 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
     return SpendingCardRenderer.render(
       widget.progress,
       username: name,
-      messageVariant: _messageVariant,
+      messageVariant: messageVariant,
+      hideAmounts: hideAmounts,
     );
   }
 
@@ -108,7 +112,8 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
             ),
           );
         }
-        if (!snapshot.hasData) {
+        if (!snapshot.hasData ||
+            snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
         final bytes = snapshot.data!;
@@ -123,15 +128,37 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: TextButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () => setState(() {
-                          _messageVariant = (_messageVariant + 1) % 5;
-                          _image = _renderImage();
-                        }),
-                  icon: const Icon(Icons.shuffle_rounded),
-                  label: const Text('Ganti pesan'),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => setState(() {
+                              _messageVariant = (_messageVariant + 1) % 5;
+                              _image = _renderImage();
+                            }),
+                      icon: const Icon(Icons.shuffle_rounded),
+                      label: const Text('Ganti pesan'),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(
+                          value: _hideAmounts,
+                          onChanged: _busy
+                              ? null
+                              : (value) => setState(() {
+                                  _hideAmounts = value ?? false;
+                                  _image = _renderImage();
+                                }),
+                        ),
+                        const Text('Tutup nominal'),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               Padding(

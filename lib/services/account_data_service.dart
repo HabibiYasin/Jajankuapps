@@ -35,6 +35,7 @@ class AccountDataService extends ChangeNotifier {
   bool _txPending = false, _budgetPending = false;
   bool _txCached = true, _budgetCached = true;
   int _writes = 0;
+  bool _budgetWriteInFlight = false;
   String? uid;
   List<TransactionModel> history = [];
   BudgetLimits limits = const BudgetLimits();
@@ -83,6 +84,7 @@ class AccountDataService extends ChangeNotifier {
     _txPending = _budgetPending = false;
     _txCached = _budgetCached = true;
     _writes = 0;
+    _budgetWriteInFlight = false;
     _emit();
     final previousTransactions = _transactions;
     final previousSettings = _settings;
@@ -120,9 +122,12 @@ class AccountDataService extends ChangeNotifier {
         .listen((snapshot) {
           if (!_active(generation)) return;
           try {
-            limits = snapshot.exists
+            final receivedLimits = snapshot.exists
                 ? BudgetLimits.fromMap(snapshot.data()!)
                 : const BudgetLimits();
+            // Local snapshots include unconfirmed writes that the server may reject.
+            // Keep the form visible until saveBudget receives server confirmation.
+            if (!_budgetWriteInFlight) limits = receivedLimits;
             // A missing cached document is not proof that this is a new account.
             _budgetReady = snapshot.exists || !snapshot.metadata.isFromCache;
             _budgetPending = snapshot.metadata.hasPendingWrites;
@@ -265,8 +270,32 @@ class AccountDataService extends ChangeNotifier {
       await prefs.setString('guest_budget_limits', jsonEncode(budget.toMap()));
       await refreshGuest();
     } else {
-      limits = BudgetLimits.fromMap(budget.toMap());
-      _queue(_cloud.budget(expectedUid).set(budget.toMap()));
+      if (_budgetWriteInFlight) throw StateError('Budget masih disimpan.');
+      final generation = _generation;
+      _budgetWriteInFlight = true;
+      _writes++;
+      error = null;
+      _emit();
+      try {
+        await _cloud
+            .budget(expectedUid)
+            .set(budget.toMap())
+            .timeout(const Duration(seconds: 15));
+        _checkOwner(expectedUid);
+        if (!_active(generation)) {
+          throw StateError('Akun berubah saat menyimpan.');
+        }
+        limits = BudgetLimits.fromMap(budget.toMap());
+      } catch (failure) {
+        _failed(failure, generation);
+        rethrow;
+      } finally {
+        if (_active(generation)) {
+          _budgetWriteInFlight = false;
+          _writes--;
+          _emit();
+        }
+      }
     }
   }
 
