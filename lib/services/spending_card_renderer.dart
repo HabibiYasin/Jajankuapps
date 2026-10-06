@@ -240,10 +240,21 @@ class SpendingCardRenderer {
       32,
       multiline: true,
     );
-    if (data.comparison case final comparison?) {
-      const comparisonBox = Rect.fromLTWH(105, 1468, 730, 62);
-      panel(comparisonBox, 18, [Colors.white, const Color(0xFFFFFCF5)]);
-      text(comparison, comparisonBox.deflate(8), 28, multiline: true);
+    // Replace the baked sharing caption in its own footer, below the message.
+    // This also covers the decorative lines beside the original caption.
+    const comparisonBox = Rect.fromLTWH(65, 1500, 811, 100);
+    panel(comparisonBox, 24, [
+      const Color(0xFFFF790A),
+      const Color(0xFFFF6108),
+    ]);
+    if (data.comparisonLabel(hideAmounts: hideAmounts) case final comparison?) {
+      text(
+        comparison,
+        comparisonBox.deflate(12),
+        30,
+        color: Colors.white,
+        multiline: true,
+      );
     }
     final picture = recorder.endRecording();
     try {
@@ -474,7 +485,8 @@ class SpendingCardRenderer {
       wrap: true,
     );
     label(
-      data.comparison ?? 'Catat jajan, lebih tenang.',
+      data.comparisonLabel(hideAmounts: hideAmounts) ??
+          'Catat jajan, lebih tenang.',
       const Rect.fromLTWH(80, 1545, 781, 95),
       30,
       color: Colors.white,

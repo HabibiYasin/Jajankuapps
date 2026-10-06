@@ -44,11 +44,18 @@ class SpendingProgress {
     final period = monthly ? 'bulan kemarin' : 'hari kemarin';
     if (spent == previous) return 'Sama dengan $period';
     if (previous == 0) {
-      return 'Belum ada pengeluaran $period untuk dibandingkan';
+      return 'Lebih boros ${rupiah(spent)} dari $period. ${monthly ? 'Bulan kemarin' : 'Kemarin'} belum nyatet kali.';
     }
     final change = ((spent - previous).abs() / previous * 100);
     final percent = change < 1 ? '<1' : change.round().toString();
     return 'Lebih ${spent < previous ? 'hemat' : 'boros'} $percent% dari $period';
+  }
+
+  String? comparisonLabel({bool hideAmounts = false}) {
+    final value = comparison;
+    return hideAmounts && previousSpent == 0
+        ? value?.replaceAll(rupiah(spent), 'XX')
+        : value;
   }
 
   List<String> get messages => switch (title) {

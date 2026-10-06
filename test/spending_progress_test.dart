@@ -12,6 +12,7 @@ void main() {
         date: DateTime(2026, 9, 30),
         spent: spent,
         budget: budget,
+        previousSpent: 100,
       );
 
   test('Titles use inclusive budget thresholds without rounding the ratio', () {
@@ -56,11 +57,23 @@ void main() {
     expect(compare(0, 100).comparison, 'Lebih hemat 100% dari hari kemarin');
     expect(
       compare(10, 0).comparison,
-      'Belum ada pengeluaran hari kemarin untuk dibandingkan',
+      'Lebih boros Rp 10 dari hari kemarin. Kemarin belum nyatet kali.',
     );
     expect(compare(99.9, 100).comparison, 'Lebih hemat <1% dari hari kemarin');
-    expect(progress(10).comparison, isNull);
+    expect(
+      SpendingProgress(
+        period: 'Hari Ini',
+        date: DateTime(2026, 10, 6),
+        spent: 10,
+        budget: 100,
+      ).comparison,
+      isNull,
+    );
     expect(progress(25).amountLabel(hideAmounts: true), 'XX / XX');
+    expect(
+      compare(10, 0).comparisonLabel(hideAmounts: true),
+      'Lebih boros XX dari hari kemarin. Kemarin belum nyatet kali.',
+    );
     expect(progress(25).amountLabel(), 'Rp 25 / Rp 100');
   });
 
