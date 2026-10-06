@@ -42,6 +42,7 @@ class AccountDataService extends ChangeNotifier {
   bool importing = false;
 
   bool get ready => _txReady && _budgetReady;
+  bool get budgetReady => _budgetReady;
   bool get pending => _writes > 0 || _txPending || _budgetPending;
   String get status =>
       error ??
@@ -122,7 +123,8 @@ class AccountDataService extends ChangeNotifier {
             limits = snapshot.exists
                 ? BudgetLimits.fromMap(snapshot.data()!)
                 : const BudgetLimits();
-            _budgetReady = true;
+            // A missing cached document is not proof that this is a new account.
+            _budgetReady = snapshot.exists || !snapshot.metadata.isFromCache;
             _budgetPending = snapshot.metadata.hasPendingWrites;
             _budgetCached = snapshot.metadata.isFromCache;
             _emit();
@@ -253,7 +255,9 @@ class AccountDataService extends ChangeNotifier {
   }) async {
     _checkOwner(expectedUid);
     if (!budget.isValid) {
-      throw ArgumentError('Isi semua budget dengan angka lebih dari nol.');
+      throw ArgumentError(
+        'Pilih kategori yang valid dan isi semua budget dengan angka lebih dari nol.',
+      );
     }
     if (expectedUid == null) {
       final prefs = await SharedPreferences.getInstance();
@@ -261,6 +265,7 @@ class AccountDataService extends ChangeNotifier {
       await prefs.setString('guest_budget_limits', jsonEncode(budget.toMap()));
       await refreshGuest();
     } else {
+      limits = BudgetLimits.fromMap(budget.toMap());
       _queue(_cloud.budget(expectedUid).set(budget.toMap()));
     }
   }

@@ -78,6 +78,13 @@ async function query(uid, owner, expected) {
   await request('PATCH',settings,'bob',budget,403);
   await request('PATCH',settings,'alice',{...budget,daily:{doubleValue:0}},403);
   await request('PATCH',settings,'alice',{...budget,weekly:{stringValue:'5000'}},403);
+  const categoryList = (...values) => ({arrayValue:{values:values.map(value => ({stringValue:value}))}});
+  await request('PATCH',settings,'alice',{...budget,categories:categoryList('Jajan','Makanan','Minuman','Belanja')});
+  await request('PATCH',settings,'bob',{...budget,categories:categoryList('Jajan')},403);
+  await request('PATCH',settings,'alice',{...budget,categories:categoryList()},403);
+  await request('PATCH',settings,'alice',{...budget,categories:categoryList('Tidak dikenal')},403);
+  await request('PATCH',settings,'alice',{...budget,categories:categoryList('Jajan','Jajan')},403);
+  await request('PATCH',settings,'alice',{...budget,categories:{stringValue:'Jajan'}},403);
   const marker = 'users/alice/imports/one';
   await request('PATCH',marker,'bob',{completed:{booleanValue:true}},403);
   await request('PATCH',marker,'alice',{completed:{booleanValue:true}});

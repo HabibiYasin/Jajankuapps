@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'models/transaction_model.dart';
+import 'models/budget_totals.dart';
 import 'services/ocr_service.dart';
 import 'services/account_data_service.dart';
 import 'services/auth_service.dart';
@@ -18,13 +19,18 @@ import 'widgets/expense_floating_menu.dart';
 import 'screens/manual_expense_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/personalization_screen.dart';
+import 'screens/splash_screen.dart';
+import 'screens/budget_settings_screen.dart';
 import 'theme/app_theme.dart';
 
 import 'firebase_options.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(const JajankuStartup());
+}
 
+Future<SharedPreferences> _initializeApp() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -44,8 +50,40 @@ Future<void> main() async {
     }
   }
 
-  final preferences = await SharedPreferences.getInstance();
-  runApp(JajankuApp(preferences: preferences));
+  return SharedPreferences.getInstance();
+}
+
+class JajankuStartup extends StatefulWidget {
+  const JajankuStartup({super.key});
+
+  @override
+  State<JajankuStartup> createState() => _JajankuStartupState();
+}
+
+class _JajankuStartupState extends State<JajankuStartup> {
+  late final Future<SharedPreferences> _initialization = _initializeApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SharedPreferences>(
+      future: _initialization,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return JajankuApp(preferences: snapshot.data!);
+        }
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: snapshot.hasError
+              ? const Scaffold(
+                  body: Center(
+                    child: Text('Gagal membuka aplikasi. Coba buka kembali.'),
+                  ),
+                )
+              : const SplashScreen(),
+        );
+      },
+    );
+  }
 }
 
 class JajankuApp extends StatefulWidget {
@@ -100,6 +138,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   List<TransactionModel> _transactionHistory = [];
   final _picker = ImagePicker();
   bool _isLoading = false;
+  File? _pendingSharedImage;
+  final Set<VoidCallback> _setupWaiters = {};
 
   late StreamSubscription _intentDataStreamSubscription;
 
@@ -116,7 +156,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
           (value) {
             if (value.isNotEmpty) {
               String sharedPath = value.first.path;
-              _processSharedImageFile(File(sharedPath));
+              _pendingSharedImage = File(sharedPath);
+              _consumeSharedImage();
             }
           },
           onError: (err) {
@@ -125,9 +166,11 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         );
 
     ReceiveSharingIntent.instance.getInitialMedia().then((value) {
+      if (!mounted) return;
       if (value.isNotEmpty) {
         String sharedPath = value.first.path;
-        _processSharedImageFile(File(sharedPath));
+        _pendingSharedImage = File(sharedPath);
+        _consumeSharedImage();
       }
       ReceiveSharingIntent.instance.reset();
     });
@@ -138,6 +181,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     WidgetsBinding.instance.removeObserver(this);
     _accountData.removeListener(_applyAccountData);
     _intentDataStreamSubscription.cancel();
+    for (final finish in _setupWaiters.toList()) {
+      finish();
+    }
     super.dispose();
   }
 
@@ -151,12 +197,57 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     setState(() {
       if (_visibleUid != _accountData.uid) {
         _visibleUid = _accountData.uid;
+        _selectedIndex = 0;
       }
       _transactionHistory = _accountData.history;
     });
+    _consumeSharedImage();
     unawaited(
-      BudgetNotificationService.sync(_transactionHistory, _dailyBudgetLimit),
+      BudgetNotificationService.sync(
+        _accountData.limits.tracked(_transactionHistory),
+        _dailyBudgetLimit,
+      ),
     );
+  }
+
+  void _consumeSharedImage() {
+    if (!mounted ||
+        !_accountData.budgetReady ||
+        !_accountData.limits.isConfigured ||
+        _pendingSharedImage == null) {
+      return;
+    }
+    final image = _pendingSharedImage!;
+    _pendingSharedImage = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_processSharedImageFile(image));
+    });
+  }
+
+  Future<bool> _awaitBudgetSetup() async {
+    final owner = _accountData.uid;
+    final result = Completer<bool>();
+    late final VoidCallback check;
+    late final VoidCallback cancel;
+    void finish(bool allowed) {
+      if (result.isCompleted) return;
+      _accountData.removeListener(check);
+      _setupWaiters.remove(cancel);
+      result.complete(allowed);
+    }
+
+    check = () {
+      if (!mounted || owner != _accountData.uid || _accountData.error != null) {
+        finish(false);
+      } else if (_accountData.budgetReady && _accountData.limits.isConfigured) {
+        finish(true);
+      }
+    };
+    cancel = () => finish(false);
+    _setupWaiters.add(cancel);
+    _accountData.addListener(check);
+    check();
+    return result.future;
   }
 
   @override
@@ -168,6 +259,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   Future<void> _processSharedImageFile(File imageFile) async {
     if (!await requireLogin(context) || !mounted) return;
+    if (!await _awaitBudgetSetup() || !mounted) return;
     final owner = _accountData.uid;
     try {
       setState(() {
@@ -216,6 +308,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   Future<void> _processImage(ImageSource source) async {
     if (!await requireLogin(context) || !mounted) return;
+    if (!await _awaitBudgetSetup() || !mounted) return;
     try {
       final pickedFile = await _picker.pickImage(source: source);
       if (pickedFile == null || !mounted) return;
@@ -230,6 +323,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   Future<void> _recordManualExpense() async {
     if (!await requireLogin(context) || !mounted) return;
+    if (!await _awaitBudgetSetup() || !mounted) return;
     final owner = _accountData.uid;
     final tx = await Navigator.of(context).push<TransactionModel>(
       MaterialPageRoute(builder: (_) => const ManualExpenseScreen()),
@@ -268,15 +362,11 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   }
 
   void _checkDailyBudget() {
-    double totalToday = 0;
-    DateTime now = DateTime.now();
-    for (var tx in _transactionHistory) {
-      if (tx.dateTime.year == now.year &&
-          tx.dateTime.month == now.month &&
-          tx.dateTime.day == now.day) {
-        totalToday += tx.numericNominal;
-      }
-    }
+    final totalToday = BudgetTotals.forPeriod(
+      _transactionHistory,
+      _accountData.limits.trackedCategories,
+      DateTime.now(),
+    ).tracked;
     if (totalToday > _dailyBudgetLimit) {
       showDialog(
         context: context,
@@ -304,8 +394,37 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   @override
   Widget build(BuildContext context) {
+    if (!_accountData.budgetReady) {
+      if (_accountData.error != null) {
+        return Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_accountData.status, textAlign: TextAlign.center),
+                FilledButton(
+                  onPressed: _accountData.retry,
+                  child: const Text('Coba lagi'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      return const SplashScreen();
+    }
+    if (!_accountData.limits.isConfigured) {
+      return BudgetSettingsScreen(
+        key: ValueKey('setup-${_accountData.uid}'),
+        onboarding: true,
+        dailyLimit: _dailyBudgetLimit,
+        weeklyLimit: _weeklyBudgetLimit,
+        monthlyLimit: _monthlyBudgetLimit,
+        categories: _accountData.limits.trackedCategories,
+      );
+    }
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const SplashScreen();
     }
 
     return Scaffold(
@@ -362,6 +481,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
             history: _transactionHistory,
             dailyLimit: _dailyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
+            budgetCategories: _accountData.limits.trackedCategories,
           ),
           TransactionHistoryScreen(
             key: ValueKey('history-${_accountData.uid}'),

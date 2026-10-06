@@ -38,6 +38,8 @@ flutter:
   assets:
     - assets/icon/
     - assets/share/
+    - assets/splash/
+    - assets/mascot/
 
 # Konfigurasi ikon aplikasi diletakkan di paling bawah
 flutter_launcher_icons:

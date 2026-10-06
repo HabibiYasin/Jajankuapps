@@ -44,7 +44,13 @@ service cloud.firestore {
       allow read: if owns(uid);
       allow create, update: if owns(uid)
         && request.resource.data.keys().hasAll(['daily', 'weekly', 'monthly'])
-        && request.resource.data.keys().hasOnly(['daily', 'weekly', 'monthly'])
+        && request.resource.data.keys().hasOnly(['daily', 'weekly', 'monthly', 'categories'])
+        && (!('categories' in request.resource.data)
+          || (request.resource.data.categories is list
+            && request.resource.data.categories.size() > 0
+            && request.resource.data.categories.size() <= 8
+            && request.resource.data.categories.toSet().size() == request.resource.data.categories.size()
+            && request.resource.data.categories.hasOnly(['Jajan', 'Makanan', 'Minuman', 'Belanja', 'Tagihan & Pulsa', 'Lifestyle', 'Transportasi', 'Umum'])))
         && positiveAmount(request.resource.data.daily)
         && positiveAmount(request.resource.data.weekly)
         && positiveAmount(request.resource.data.monthly);

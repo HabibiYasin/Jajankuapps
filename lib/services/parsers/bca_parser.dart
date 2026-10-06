@@ -4,7 +4,10 @@ class BcaParser {
   // Deteksi apakah struk berasal dari BCA / m-BCA
   static bool isMatch(String rawText) {
     String lower = rawText.toLowerCase();
-    return lower.contains("pembayaran qr") && (lower.contains("bca") || lower.contains("ref") || lower.contains("rrn"));
+    return lower.contains("pembayaran qr") &&
+        (lower.contains("bca") ||
+            lower.contains("ref") ||
+            lower.contains("rrn"));
   }
 
   static TransactionModel parse(String rawText, List<String> cleanedLines) {
@@ -14,7 +17,9 @@ class BcaParser {
     DateTime parsedDate = DateTime.now(); // Default ke hari ini jika gagal
 
     // Pola Regex untuk mendeteksi tanggal BCA: 16/08/2026 13:56:51
-    RegExp dateRegex = RegExp(r'(\d{2})/(\d{2})/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})');
+    RegExp dateRegex = RegExp(
+      r'(\d{2})/(\d{2})/(\d{4})\s*(?:[-–]\s*)?(\d{2}):(\d{2}):(\d{2})',
+    );
 
     // 1. Ekstrak Tanggal & Waktu Akurat
     for (String line in cleanedLines) {
@@ -37,9 +42,15 @@ class BcaParser {
       String lower = line.toLowerCase();
 
       if (lower.contains("total pembayaran") || lower.contains("rp")) {
-        final match = RegExp(r'Rp[0-9.,]+').firstMatch(line);
+        final amountRegex = RegExp(r'Rp\s*[0-9][0-9.,]*', caseSensitive: false);
+        final match =
+            amountRegex.firstMatch(line) ??
+            (lower.contains('total pembayaran') && i + 1 < cleanedLines.length
+                ? amountRegex.firstMatch(cleanedLines[i + 1])
+                : null);
         if (match != null) {
-          nominalStr = match.group(0)!;
+          nominalStr =
+              'Rp${match.group(0)!.replaceFirst(RegExp(r'^Rp\s*', caseSensitive: false), '')}';
           break;
         }
       }
@@ -47,7 +58,7 @@ class BcaParser {
 
     String cleanNumStr = nominalStr;
     if (cleanNumStr.contains(',')) {
-      cleanNumStr = cleanNumStr.split(',')[0]; 
+      cleanNumStr = cleanNumStr.split(',')[0];
     }
     String cleanNum = cleanNumStr.replaceAll(RegExp(r'[^0-9]'), '');
     numericVal = double.tryParse(cleanNum) ?? 0;
@@ -55,15 +66,18 @@ class BcaParser {
     // 3. Ambil Nama Merchant BCA (1 baris di bawah tanggal)
     for (int i = 0; i < cleanedLines.length; i++) {
       String line = cleanedLines[i];
-      
+
       if (dateRegex.hasMatch(line)) {
-        if (i + 1 < cleanedLines.length) {
-          String candidate = cleanedLines[i + 1];
-          if (!candidate.toLowerCase().contains("no. transaksi") && !candidate.toLowerCase().contains("total")) {
+        for (var j = i + 1; j < cleanedLines.length; j++) {
+          String candidate = cleanedLines[j];
+          if (candidate.toLowerCase() == 'bca') continue;
+          if (!candidate.toLowerCase().contains("no. transaksi") &&
+              !candidate.toLowerCase().contains("total")) {
             merchantName = candidate;
-            break;
           }
+          break;
         }
+        if (merchantName != 'Tidak Diketahui') break;
       }
     }
 
@@ -90,9 +104,14 @@ class BcaParser {
     // 4. Kategori Otomatis
     String category = "Makanan";
     String lowerMerchant = merchantName.toLowerCase();
-    if (lowerMerchant.contains("bika ambon") || lowerMerchant.contains("roti") || lowerMerchant.contains("kopi") || lowerMerchant.contains("bakso") || lowerMerchant.contains("rica")) {
+    if (lowerMerchant.contains("bika ambon") ||
+        lowerMerchant.contains("roti") ||
+        lowerMerchant.contains("kopi") ||
+        lowerMerchant.contains("bakso") ||
+        lowerMerchant.contains("rica")) {
       category = "Makanan";
-    } else if (lowerMerchant.contains("indomaret") || lowerMerchant.contains("alfamart")) {
+    } else if (lowerMerchant.contains("indomaret") ||
+        lowerMerchant.contains("alfamart")) {
       category = "Belanja";
     } else {
       category = "Lifestyle";
@@ -101,10 +120,10 @@ class BcaParser {
     return TransactionModel(
       merchant: merchantName,
       nominalStr: nominalStr,
-      dateTime: parsedDate, 
+      dateTime: parsedDate,
       category: category,
       numericNominal: numericVal,
-      source: "BCA", 
+      source: "BCA",
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
@@ -19,6 +20,7 @@ class SpendingProgressScreen extends StatefulWidget {
 class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
   late Future<Uint8List> _image;
   bool _busy = false;
+  int _messageVariant = Random().nextInt(5);
   @override
   void initState() {
     super.initState();
@@ -36,7 +38,11 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
       user?.displayName,
       'Jajaners',
     ].whereType<String>().firstWhere((value) => value.trim().isNotEmpty).trim();
-    return SpendingCardRenderer.render(widget.progress, username: name);
+    return SpendingCardRenderer.render(
+      widget.progress,
+      username: name,
+      messageVariant: _messageVariant,
+    );
   }
 
   Future<void> _export(Uint8List bytes, {required bool share}) async {
@@ -113,6 +119,19 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() {
+                          _messageVariant = (_messageVariant + 1) % 5;
+                          _image = _renderImage();
+                        }),
+                  icon: const Icon(Icons.shuffle_rounded),
+                  label: const Text('Ganti pesan'),
                 ),
               ),
               Padding(

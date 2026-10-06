@@ -1,4 +1,3 @@
-
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_application_1/models/budget_limits.dart';
@@ -34,16 +33,22 @@ void main() {
     await second.switchAccount('alice');
     await first.insert(sample(), expectedUid: 'alice');
     await first.saveBudget(
-      const BudgetLimits(daily: 70000),
+      const BudgetLimits(
+        daily: 70000,
+        categories: BudgetLimits.snackCategories,
+      ),
       expectedUid: 'alice',
     );
     await settle();
     expect(second.history.single.numericNominal, 62500);
     expect(second.limits.daily, 70000);
+    expect(second.limits.isConfigured, true);
+    expect(second.limits.trackedCategories, BudgetLimits.snackCategories);
     final previousTransaction = first.history.single;
     current = 'bob';
     final switching = first.switchAccount('bob');
     expect(first.history, isEmpty);
+    expect(first.limits.isConfigured, false);
     expect(first.limits.daily, 50000);
     await switching;
     await settle();

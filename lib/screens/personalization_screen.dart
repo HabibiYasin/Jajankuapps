@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/auth_service.dart';
 import '../services/account_data_service.dart';
+import '../services/budget_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tutorial_dialog.dart';
 import 'budget_settings_screen.dart';
@@ -43,6 +44,11 @@ class PersonalizationScreen extends StatefulWidget {
 
 class _PersonalizationScreenState extends State<PersonalizationScreen> {
   bool _loading = false;
+  bool? _notificationsEnabled;
+  bool? _noonEnabled;
+  bool _savingNoon = false;
+  bool _savingNotifications = false;
+  bool _notificationLoadFailed = false;
   String? _savedName;
   int _nameGeneration = 0;
   StreamSubscription<User?>? _authSubscription;
@@ -50,10 +56,63 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
   @override
   void initState() {
     super.initState();
+    if (BudgetNotificationService.isSupported) _loadNotifications();
     final auth = AuthService.instance;
     _loadSavedName(auth.currentUser);
     if (auth.isConfigured) {
       _authSubscription = auth.authStateChanges.listen(_loadSavedName);
+    }
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final enabled = await BudgetNotificationService.isEnabled();
+      final noonEnabled = await BudgetNotificationService.isNoonEnabled();
+      if (mounted) {
+        setState(() {
+          _notificationsEnabled = enabled;
+          _noonEnabled = noonEnabled;
+          _notificationLoadFailed = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _notificationLoadFailed = true);
+    }
+  }
+
+  Future<void> _toggleNotifications(bool enabled) async {
+    setState(() => _savingNotifications = true);
+    try {
+      await BudgetNotificationService.setEnabled(enabled);
+      if (mounted) setState(() => _notificationsEnabled = enabled);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pengaturan notifikasi gagal disimpan. Coba lagi.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingNotifications = false);
+    }
+  }
+
+  Future<void> _toggleNoon(bool enabled) async {
+    setState(() => _savingNoon = true);
+    try {
+      await BudgetNotificationService.setNoonEnabled(enabled);
+      if (mounted) setState(() => _noonEnabled = enabled);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pengingat jam 12 gagal disimpan. Coba lagi.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingNoon = false);
     }
   }
 
@@ -386,9 +445,8 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           _menuTile(
             icon: Icons.account_balance_wallet_outlined,
             title: 'Limit Budget',
-            subtitle: 'Atur batas harian, mingguan, dan bulanan',
+            subtitle: 'Atur kategori dan batas harian, mingguan, bulanan',
             onTap: () async {
-              if (!await requireLogin(context) || !context.mounted) return;
               final limits = AccountDataService.instance.limits;
               await Navigator.push(
                 context,
@@ -397,6 +455,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
                     dailyLimit: limits.daily,
                     weeklyLimit: limits.weekly,
                     monthlyLimit: limits.monthly,
+                    categories: limits.trackedCategories,
                   ),
                 ),
               );
@@ -408,6 +467,42 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
             subtitle: 'Lihat panduan penggunaan aplikasi',
             onTap: () => showTutorialDialog(context),
           ),
+          if (BudgetNotificationService.isSupported)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.notifications_active_outlined),
+                    title: const Text('Notifikasi persistent'),
+                    subtitle: const Text(
+                      'Tampilkan progres budget harian di panel notifikasi.',
+                    ),
+                    value: _notificationsEnabled ?? true,
+                    onChanged:
+                        _notificationsEnabled == null || _savingNotifications
+                        ? null
+                        : _toggleNotifications,
+                  ),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.wb_sunny_outlined),
+                    title: const Text('Pengingat jam 12 siang'),
+                    subtitle: const Text(
+                      'Cek persentase budget terpakai setiap pukul 12.00.',
+                    ),
+                    value: _noonEnabled ?? true,
+                    onChanged: _noonEnabled == null || _savingNoon
+                        ? null
+                        : _toggleNoon,
+                  ),
+                  if (_notificationLoadFailed)
+                    TextButton(
+                      onPressed: _loadNotifications,
+                      child: const Text('Coba muat pengaturan notifikasi lagi'),
+                    ),
+                ],
+              ),
+            ),
           const SizedBox(height: 12),
           Text('Akun', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),

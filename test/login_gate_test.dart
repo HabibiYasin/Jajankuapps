@@ -6,7 +6,7 @@ import 'package:flutter_application_1/screens/budget_settings_screen.dart';
 import 'package:flutter_application_1/screens/personalization_screen.dart';
 
 void main() {
-  testWidgets('Guest must log in before opening budget settings', (
+  testWidgets('Guest can configure budget categories without logging in', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -25,9 +25,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Limit Budget'));
     await tester.pumpAndSettle();
-    expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.text('Kamu harus login dulu sebelum catat'), findsOneWidget);
-    expect(find.byType(BudgetSettingsScreen), findsNothing);
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(BudgetSettingsScreen), findsOneWidget);
+    expect(find.text('Kategori yang mengurangi budget'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(LoginScreen), findsNothing);

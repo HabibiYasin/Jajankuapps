@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/transaction_model.dart';
+import '../models/budget_totals.dart';
+import '../services/transaction_classifier.dart';
 import 'top_categories_widget.dart';
 import '../widgets/tutorial_dialog.dart';
 import '../theme/app_theme.dart';
@@ -12,12 +14,14 @@ class DashboardScreen extends StatefulWidget {
   final List<TransactionModel> history;
   final double dailyLimit;
   final double monthlyLimit;
+  final List<String> budgetCategories;
 
   const DashboardScreen({
     super.key,
     required this.history,
     required this.dailyLimit,
     required this.monthlyLimit,
+    this.budgetCategories = TransactionClassifier.categories,
   });
 
   @override
@@ -67,16 +71,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await showTutorialDialog(context, allowHideToday: true);
   }
 
-  double _calculateTotal(DateTime period, {bool monthly = false}) {
-    return widget.history
-        .where((tx) {
-          final date = tx.dateTime;
-          return date.year == period.year &&
-              date.month == period.month &&
-              (monthly || date.day == period.day);
-        })
-        .fold(0.0, (total, tx) => total + tx.numericNominal);
-  }
+  double _calculateTotal(DateTime period, {bool monthly = false}) =>
+      BudgetTotals.forPeriod(
+        widget.history,
+        widget.budgetCategories,
+        period,
+        monthly: monthly,
+      ).tracked;
 
   String _formatAmount(double amount) {
     if (amount.abs() < 1000) return amount.toStringAsFixed(0);
@@ -234,14 +235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<double> dailyTotals = [];
     for (int i = 6; i >= 0; i--) {
       DateTime targetDay = now.subtract(Duration(days: i));
-      double dailyTotal = 0;
-      for (var tx in widget.history) {
-        if (tx.dateTime.year == targetDay.year &&
-            tx.dateTime.month == targetDay.month &&
-            tx.dateTime.day == targetDay.day) {
-          dailyTotal += tx.numericNominal;
-        }
-      }
+      final dailyTotal = _calculateTotal(targetDay);
       dailyTotals.add(dailyTotal);
       if (dailyTotal > maxVal) maxVal = dailyTotal;
     }
@@ -358,7 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 24),
           const Text(
-            'Statistik Belanja (7 Hari Terakhir)',
+            'Pengeluaran Budget (7 Hari Terakhir)',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 12),
@@ -380,6 +374,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           TopCategoriesWidget(history: widget.history),
           const SizedBox(height: 24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Budget lainnya',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Pengeluaran di luar kategori pilihan. Tidak mengurangi limit budget.',
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Budget lainnya hari ini: Rp${_formatAmount(BudgetTotals.forPeriod(widget.history, widget.budgetCategories, now).other)}',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Budget lainnya bulan ini: Rp${_formatAmount(BudgetTotals.forPeriod(widget.history, widget.budgetCategories, now, monthly: true).other)}',
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

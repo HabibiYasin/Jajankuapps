@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -7,6 +5,28 @@ import '../models/transaction_model.dart';
 
 class BudgetNotificationService {
   static const _channel = MethodChannel('com.jajanku.app/budget_notification');
+  static bool get isSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  static Future<bool> isEnabled() async {
+    if (!isSupported) return false;
+    return await _channel.invokeMethod<bool>('getEnabled') ?? true;
+  }
+
+  static Future<void> setEnabled(bool enabled) async {
+    if (!isSupported) return;
+    await _channel.invokeMethod<void>('setEnabled', {'enabled': enabled});
+  }
+
+  static Future<bool> isNoonEnabled() async {
+    if (!isSupported) return false;
+    return await _channel.invokeMethod<bool>('getNoonEnabled') ?? true;
+  }
+
+  static Future<void> setNoonEnabled(bool enabled) async {
+    if (!isSupported) return;
+    await _channel.invokeMethod<void>('setNoonEnabled', {'enabled': enabled});
+  }
 
   static Map<String, double> dailyTotals(List<TransactionModel> history) {
     final totals = <String, double>{};
@@ -28,7 +48,7 @@ class BudgetNotificationService {
     List<TransactionModel> history,
     double dailyLimit,
   ) async {
-    if (!Platform.isAndroid) return;
+    if (!isSupported) return;
     try {
       await _channel.invokeMethod<void>('sync', {
         'dailyLimit': dailyLimit,

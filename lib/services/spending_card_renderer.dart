@@ -10,8 +10,9 @@ class SpendingCardRenderer {
   static Future<Uint8List> render(
     SpendingProgress data, {
     String username = 'Jajaners',
+    int messageVariant = 0,
   }) async {
-    final asset = await rootBundle.load('assets/share/spending_progress.png');
+    final asset = await rootBundle.load(data.artworkAsset);
     final codec = await ui.instantiateImageCodec(
       asset.buffer.asUint8List(asset.offsetInBytes, asset.lengthInBytes),
     );
@@ -20,6 +21,9 @@ class SpendingCardRenderer {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)..scale(1080 / 941);
     const orange = Color(0xFFFF5100);
+    final duar = data.title == 'Duar';
+    final hematers = data.title == 'Hematers' || !data.hasBudget;
+    final perfectionist = data.title == 'Perfectionist';
     const bounds = Rect.fromLTWH(0, 0, 941, 1672);
     canvas.drawImageRect(
       background,
@@ -46,6 +50,7 @@ class SpendingCardRenderer {
         text: TextSpan(
           text: value,
           style: TextStyle(
+            fontFamily: 'Roboto',
             fontSize: fontSize,
             fontWeight: weight,
             color: color,
@@ -79,7 +84,7 @@ class SpendingCardRenderer {
     }
 
     // Replace every example placeholder while retaining the mascot and artwork.
-    const heading = Rect.fromLTWH(55, 247, 530, 128);
+    final heading = Rect.fromLTWH(55, duar ? 300 : 247, 530, 128);
     if (data.period != 'Kemarin') {
       canvas.drawRect(
         heading,
@@ -133,63 +138,63 @@ class SpendingCardRenderer {
     }
 
     pill(
-      const Rect.fromLTWH(70, 395, 446, 74),
+      Rect.fromLTWH(70, duar ? 440 : (hematers ? 417 : 395), 440, 74),
       Icons.calendar_month_rounded,
       data.dateLabel,
     );
     final name = username.trim().replaceFirst(RegExp(r'^@+'), '');
     pill(
-      const Rect.fromLTWH(70, 483, 437, 75),
+      Rect.fromLTWH(70, duar ? 520 : (hematers ? 503 : 483), 437, 75),
       Icons.person_rounded,
       '@${name.isEmpty ? 'Jajaners' : name}',
     );
 
-    // Start below the mascot's paws so they remain visible over the card.
-    canvas.save();
-    canvas.clipRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(53, 570, 836, 700),
-        const Radius.circular(62),
-      ),
+    // Cover dynamic fields and preserve each title's original illustration.
+    final progressBox = Rect.fromLTWH(
+      85,
+      duar ? 754 : 744,
+      776,
+      duar ? 211 : 188,
     );
-    panel(const Rect.fromLTWH(53, 609, 836, 661), 0, [
-      const Color(0xFFFFFEFC),
-      Colors.white,
-      const Color(0xFFFFFCF5),
-    ]);
-    canvas.drawCircle(
-      const Offset(471, 925),
-      334,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 62
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFDFBC), Color(0x18FFF2E1)],
-        ).createShader(const Rect.fromLTWH(106, 591, 730, 730)),
-    );
+    panel(progressBox, 32, [Colors.white, const Color(0xFFFFFCF5)]);
     text(
       data.hasBudget
           ? '${data.percentage.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '')}%'
-          : 'â€”',
-      const Rect.fromLTWH(104, 743, 733, 165),
+          : '-',
+      progressBox.deflate(12),
       148,
       weight: FontWeight.w900,
     );
-    text(
-      data.title,
-      const Rect.fromLTWH(106, 940, 730, 101),
-      82,
-      weight: FontWeight.w900,
+    if (!data.hasBudget) {
+      const titleBox = Rect.fromLTWH(175, 947, 598, 137);
+      panel(titleBox, 24, [Colors.white, const Color(0xFFFFFCF5)]);
+      text(data.title, titleBox.deflate(10), 64, weight: FontWeight.w900);
+    }
+    final amountBox = Rect.fromLTWH(
+      164,
+      duar ? 1159 : (perfectionist || hematers ? 1105 : 1070),
+      618,
+      65,
     );
+    panel(amountBox, 14, [Colors.white, const Color(0xFFFFFCF5)]);
     text(
       '${SpendingProgress.rupiah(data.spent)} / ${SpendingProgress.rupiah(data.budget)}',
-      const Rect.fromLTWH(112, 1074, 718, 61),
+      amountBox.deflate(4),
       40,
       color: const Color(0xFF32120A),
     );
-    const bar = Rect.fromLTWH(108, 1153, 725, 55);
+    final bar = Rect.fromLTWH(
+      108,
+      duar
+          ? 1225
+          : (hematers
+                ? 1185
+                : (perfectionist
+                      ? 1175
+                      : (data.title == 'Strategist' ? 1151 : 1142))),
+      725,
+      70,
+    );
     panel(bar, 30, [const Color(0xFFFFE6CB), const Color(0xFFFFDDC0)]);
     final fraction = (data.percentage / 100).clamp(0.0, 1.0);
     if (fraction > 0) {
@@ -202,8 +207,12 @@ class SpendingCardRenderer {
       );
       canvas.restore();
     }
-    canvas.restore();
-    const messageBox = Rect.fromLTWH(59, 1291, 823, 170);
+    final messageBox = Rect.fromLTWH(
+      165,
+      hematers ? 1338 : (duar ? 1328 : 1310),
+      612,
+      130,
+    );
     panel(messageBox, 50, [
       const Color(0xFFFFE9CD),
       const Color(0xFFFFFCF6),
@@ -216,7 +225,12 @@ class SpendingCardRenderer {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
-    text(data.message, messageBox.deflate(30), 36, multiline: true);
+    text(
+      data.messageForVariant(messageVariant),
+      messageBox.deflate(15),
+      32,
+      multiline: true,
+    );
     final picture = recorder.endRecording();
     try {
       final image = await picture.toImage(1080, 1920);

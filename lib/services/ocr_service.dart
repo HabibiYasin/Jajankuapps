@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:math'; // <-- PENTING: Tambahkan import math untuk fungsi min() & max()
+
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+
 import '../models/transaction_model.dart';
 import 'qris_parser.dart';
 
@@ -8,16 +10,16 @@ class OcrService {
   static Future<TransactionModel> processImage(File imageFile) async {
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     final inputImage = InputImage.fromFile(imageFile);
-    
+
     try {
       final recognizedText = await textRecognizer.processImage(inputImage);
-      
+
       // Menggabungkan teks menggunakan Intersection / Tumpang Tindih
       String formattedText = extractSpatialText(recognizedText);
-      
+
       final transaction = QrisParser.parseReceipt(formattedText);
-      DateTime receiptDateTime = _extractDateTimeFromOCR(formattedText);
-      
+      DateTime receiptDateTime = extractDateTimeFromOCR(formattedText);
+
       textRecognizer.close();
 
       return TransactionModel(
@@ -26,7 +28,7 @@ class OcrService {
         nominalStr: transaction.nominalStr,
         numericNominal: transaction.numericNominal,
         dateTime: receiptDateTime,
-        source: transaction.source, 
+        source: transaction.source,
       );
     } catch (e) {
       textRecognizer.close();
@@ -38,7 +40,7 @@ class OcrService {
   // Menyatukan teks kiri dan kanan berdasarkan tumpang tindih jalur horizontal
   static String extractSpatialText(RecognizedText recognizedText) {
     List<TextLine> allLines = [];
-    
+
     for (TextBlock block in recognizedText.blocks) {
       allLines.addAll(block.lines);
     }
@@ -49,18 +51,16 @@ class OcrService {
 
     for (TextLine line in allLines) {
       bool addedToRow = false;
-      
+
       final lineHeight = line.boundingBox.height;
       final lineCenterY = line.boundingBox.center.dy;
 
       for (List<TextLine> row in rows) {
-        final rowCenterY = row
-                .map((e) => e.boundingBox.center.dy)
-                .reduce((a, b) => a + b) /
+        final rowCenterY =
+            row.map((e) => e.boundingBox.center.dy).reduce((a, b) => a + b) /
             row.length;
-        final rowAverageHeight = row
-                .map((e) => e.boundingBox.height)
-                .reduce((a, b) => a + b) /
+        final rowAverageHeight =
+            row.map((e) => e.boundingBox.height).reduce((a, b) => a + b) /
             row.length;
 
         // Bandingkan pusat vertikal, bukan tinggi gabungan row. Tinggi gabungan
@@ -123,7 +123,8 @@ class OcrService {
 
       final previous = normalized[i - 1].trim();
       var accountNumber = (sourceMatch.group(1) ?? '').trim();
-      final looksLikeAccountName = RegExp(r'^[A-Z][A-Z\s.]{3,}$').hasMatch(previous);
+      final looksLikeAccountName = RegExp(r'^[A-Z][A-Z\s.]{3,}$')
+          .hasMatch(previous);
       var accountIsOnNextRow = false;
 
       if (!RegExp(r'\d{3,}\*+\d+').hasMatch(accountNumber) &&
@@ -148,14 +149,19 @@ class OcrService {
     return normalized;
   }
 
-  static DateTime _extractDateTimeFromOCR(String recognizedText) {
-    final dateRegexNumeric = RegExp(r'\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b');
+  static DateTime extractDateTimeFromOCR(String recognizedText) {
+    final dateRegexIso = RegExp(r'\b(\d{4})-(\d{2})-(\d{2})\b');
+    final dateRegexNumeric = RegExp(
+      r'\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b',
+    );
     // Gunakan spasi horizontal, bukan \s, supaya regex tidak menyeberang
     // newline (misalnya "18:16\nTanggal 26" menjadi "16 Tanggal 26").
     final dateRegexText = RegExp(
       r'\b(\d{1,2})[ \t]+([A-Za-z]{3,9})[ \t]+(\d{2,4})\b',
     );
-    final timeRegex = RegExp(r'\b([0-1]?[0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?\s*([APap][Mm])?\b');
+    final timeRegex = RegExp(
+      r'\b([0-1]?[0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?\s*([APap][Mm])?\b',
+    );
 
     int? day, month, year;
     int hour = 0, minute = 0, second = 0;
@@ -172,8 +178,13 @@ class OcrService {
     }
 
     if (day == null) {
+      final isoMatch = dateRegexIso.firstMatch(recognizedText);
       final numericMatch = dateRegexNumeric.firstMatch(recognizedText);
-      if (numericMatch != null) {
+      if (isoMatch != null) {
+        year = int.parse(isoMatch.group(1)!);
+        month = int.parse(isoMatch.group(2)!);
+        day = int.parse(isoMatch.group(3)!);
+      } else if (numericMatch != null) {
         day = int.parse(numericMatch.group(1)!);
         month = int.parse(numericMatch.group(2)!);
         int parsedYear = int.parse(numericMatch.group(3)!);
@@ -188,7 +199,7 @@ class OcrService {
       if (timeMatch.group(3) != null) {
         second = int.parse(timeMatch.group(3)!);
       }
-      
+
       String? amPm = timeMatch.group(4);
       if (amPm != null) {
         if (amPm.toUpperCase() == 'PM' && hour < 12) hour += 12;
@@ -200,30 +211,50 @@ class OcrService {
       return DateTime(year, month, day, hour, minute, second);
     }
 
-    return DateTime.now(); 
+    return DateTime.now();
   }
 
   static int? _parseIndonesianMonth(String monthStr) {
-    String sanitized = monthStr.toLowerCase()
+    String sanitized = monthStr
+        .toLowerCase()
         .replaceAll('1', 'i')
-        .replaceAll('l', 'i') 
+        .replaceAll('l', 'i')
         .replaceAll('q', 'g')
         .replaceAll('0', 'o')
-        .replaceAll('5', 's'); 
+        .replaceAll('5', 's');
 
     const months = {
-      'jan': 1, 'januari': 1,
-      'feb': 2, 'februari': 2,
-      'mar': 3, 'maret': 3,
-      'apr': 4, 'april': 4,
-      'mei': 5, 'may': 5, 'mel': 5,
-      'jun': 6, 'juni': 6,
-      'jul': 7, 'juli': 7, 'jui': 7,
-      'agu': 8, 'agust': 8, 'agustus': 8, 'aug': 8, 'ags': 8,
-      'sep': 9, 'september': 9,
-      'okt': 10, 'oktober': 10, 'oct': 10,
-      'nov': 11, 'november': 11,
-      'des': 12, 'desember': 12, 'dec': 12,
+      'jan': 1,
+      'januari': 1,
+      'feb': 2,
+      'februari': 2,
+      'mar': 3,
+      'maret': 3,
+      'apr': 4,
+      'april': 4,
+      'mei': 5,
+      'may': 5,
+      'mel': 5,
+      'jun': 6,
+      'juni': 6,
+      'jul': 7,
+      'juli': 7,
+      'jui': 7,
+      'agu': 8,
+      'agust': 8,
+      'agustus': 8,
+      'aug': 8,
+      'ags': 8,
+      'sep': 9,
+      'september': 9,
+      'okt': 10,
+      'oktober': 10,
+      'oct': 10,
+      'nov': 11,
+      'november': 11,
+      'des': 12,
+      'desember': 12,
+      'dec': 12,
     };
 
     // Bulan yang tidak dikenal tidak boleh diam-diam dianggap Januari.
