@@ -19,7 +19,7 @@ service cloud.firestore {
       return value is number && value > 0 && value <= 1000000000000000;
     }
     match /users/{uid} {
-      allow get: if owns(uid);
+      allow get, delete: if owns(uid);
       allow create: if owns(uid)
         && request.resource.data.keys().hasAll(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
         && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
@@ -41,7 +41,7 @@ service cloud.firestore {
       allow create, update: if owns(uid) && validTransaction();
     }
     match /users/{uid}/settings/budget {
-      allow read: if owns(uid);
+      allow read, delete: if owns(uid);
       allow create, update: if owns(uid)
         && request.resource.data.keys().hasAll(['daily', 'weekly', 'monthly'])
         && request.resource.data.keys().hasOnly(['daily', 'weekly', 'monthly', 'categories'])
@@ -56,7 +56,7 @@ service cloud.firestore {
         && positiveAmount(request.resource.data.monthly);
     }
     match /users/{uid}/imports/{id} {
-      allow read: if owns(uid);
+      allow read, delete: if owns(uid);
       allow create: if owns(uid)
         && request.resource.data.keys().hasOnly(['completed'])
         && request.resource.data.completed == true;

@@ -18,6 +18,7 @@ import 'screens/transaction_history_screen.dart';
 import 'widgets/expense_floating_menu.dart';
 import 'screens/manual_expense_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/email_verification_screen.dart';
 import 'screens/personalization_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/budget_settings_screen.dart';
@@ -213,7 +214,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   void _consumeSharedImage() {
     if (!mounted ||
         !_accountData.budgetReady ||
-        !_accountData.limits.isConfigured ||
+        (_accountData.uid != null && !_accountData.limits.isConfigured) ||
         _pendingSharedImage == null) {
       return;
     }
@@ -239,7 +240,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     check = () {
       if (!mounted || owner != _accountData.uid || _accountData.error != null) {
         finish(false);
-      } else if (_accountData.budgetReady && _accountData.limits.isConfigured) {
+      } else if (_accountData.budgetReady &&
+          (_accountData.uid == null || _accountData.limits.isConfigured)) {
         finish(true);
       }
     };
@@ -394,6 +396,10 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+    if (AuthService.needsEmailVerification(user)) {
+      return const EmailVerificationScreen();
+    }
     if (!_accountData.budgetReady) {
       if (_accountData.error != null) {
         return Scaffold(
@@ -413,7 +419,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       }
       return const SplashScreen();
     }
-    if (!_accountData.limits.isConfigured) {
+    if (_accountData.uid != null && !_accountData.limits.isConfigured) {
       return BudgetSettingsScreen(
         key: ValueKey('setup-${_accountData.uid}'),
         onboarding: true,

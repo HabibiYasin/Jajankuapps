@@ -1,3 +1,5 @@
+import 'auth_service.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -63,8 +65,12 @@ class AccountDataService extends ChangeNotifier {
     if (Firebase.apps.isEmpty) {
       unawaited(switchAccount(null));
     } else {
-      _auth = FirebaseAuth.instance.authStateChanges().listen(
-        (user) => unawaited(switchAccount(user?.uid)),
+      _auth = FirebaseAuth.instance.userChanges().listen(
+        (user) => unawaited(
+          switchAccount(
+            AuthService.needsEmailVerification(user) ? null : user?.uid,
+          ),
+        ),
       );
     }
   }

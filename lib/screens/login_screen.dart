@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/auth_service.dart';
 import '../services/account_data_service.dart';
+import 'email_verification_screen.dart';
 
 Future<bool> requireLogin(BuildContext context) async {
   if (AuthService.instance.currentUser == null) {
@@ -13,7 +14,7 @@ Future<bool> requireLogin(BuildContext context) async {
     if (result != true || !context.mounted) return false;
   }
   final user = AuthService.instance.currentUser;
-  if (user == null) return false;
+  if (user == null || AuthService.needsEmailVerification(user)) return false;
   final data = AccountDataService.instance;
   if (data.uid != user.uid) await data.switchAccount(user.uid);
   return context.mounted && AuthService.instance.currentUser?.uid == user.uid;
@@ -60,18 +61,31 @@ class _LoginScreenState extends State<LoginScreen> {
       await action();
       if (!mounted) return;
       if (login && AuthService.instance.currentUser != null) {
-        Navigator.of(context).pop(true);
+        if (AuthService.needsEmailVerification(
+          AuthService.instance.currentUser,
+        )) {
+          final verified = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  const EmailVerificationScreen(popOnVerified: true),
+            ),
+          );
+          if (!mounted || verified != true) return;
+        }
+        if (mounted) Navigator.of(context).pop(true);
       } else if (!login) {
         _message(
-          'Jika email terdaftar, tautan reset password akan dikirim. Cek juga folder spam.',
+          'Permintaan reset diterima. Jika email terdaftar, tautan akan dikirim. Cek kotak masuk dan spam.',
         );
       }
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       _message(switch (error.code) {
-        'invalid-credential' ||
-        'wrong-password' ||
-        'user-not-found' => 'Email atau password salah.',
+        'invalid-credential' || 'wrong-password' || 'user-not-found' =>
+          login
+              ? 'Email atau password salah.'
+              : 'Email belum terdaftar. Silakan daftar terlebih dahulu.',
         'email-already-in-use' =>
           'Email sudah terdaftar. Silakan masuk atau reset password.',
         'weak-password' =>

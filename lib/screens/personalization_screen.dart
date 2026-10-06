@@ -11,6 +11,9 @@ import '../theme/app_theme.dart';
 import '../widgets/tutorial_dialog.dart';
 import 'budget_settings_screen.dart';
 import 'login_screen.dart';
+import 'change_password_screen.dart';
+import 'delete_account_screen.dart';
+import 'privacy_policy_screen.dart';
 
 enum UserTier {
   guest('Jajaners CobaCoba'),
@@ -127,17 +130,78 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
 
   Future<void> _loadSavedName(User? user) async {
     final generation = ++_nameGeneration;
-    if (mounted) setState(() => _savedName = null);
+    if (mounted) {
+      setState(() {
+        _savedName = null;
+      });
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedName = prefs.getString(_nameKey(user?.uid));
       if (mounted &&
           generation == _nameGeneration &&
           AuthService.instance.currentUser?.uid == user?.uid) {
-        setState(() => _savedName = savedName);
+        setState(() {
+          _savedName = user?.displayName ?? savedName;
+        });
       }
     } catch (error) {
       debugPrint('Gagal memuat nama: $error');
+    }
+  }
+
+  Future<void> _accountSettings(User? user) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Pengaturan akun',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit nama'),
+              onTap: () => Navigator.pop(sheetContext, 'name'),
+            ),
+            if (user != null)
+              ListTile(
+                leading: const Icon(Icons.delete_forever_outlined),
+                title: const Text('Hapus akun'),
+                onTap: () => Navigator.pop(sheetContext, 'delete'),
+              ),
+            if (user != null)
+              ListTile(
+                leading: const Icon(Icons.lock_outline),
+                title: const Text('Ganti password'),
+                onTap: () => Navigator.pop(sheetContext, 'password'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || AuthService.instance.currentUser?.uid != user?.uid) return;
+    if (action == 'name') await _editName(user);
+    if (action == 'delete' && user != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => DeleteAccountScreen(user: user),
+        ),
+      );
+    }
+    if (action == 'password' && user != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => ChangePasswordScreen(user: user),
+        ),
+      );
     }
   }
 
@@ -188,7 +252,11 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
     );
     if (newName == null || !mounted) return;
 
+    setState(() => _loading = true);
     try {
+      if (user != null) {
+        await AuthService.instance.updateDisplayName(user.uid, newName);
+      }
       final prefs = await SharedPreferences.getInstance();
       if (!mounted || AuthService.instance.currentUser?.uid != user?.uid) {
         return;
@@ -206,8 +274,12 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama gagal disimpan. Coba lagi.')),
+        const SnackBar(
+          content: Text('Nama gagal disimpan. Periksa internet dan coba lagi.'),
+        ),
       );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -350,7 +422,6 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
   );
 
   Widget _profile(User? user) {
-    final photoUrl = user?.photoURL;
     final tier = user == null ? UserTier.guest : widget.loggedInTier;
     return Container(
       decoration: BoxDecoration(
@@ -366,17 +437,14 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           horizontal: 20,
           vertical: 18,
         ),
-        leading: CircleAvatar(
+        leading: const CircleAvatar(
           radius: 30,
           backgroundColor: AppColors.aqua,
-          backgroundImage: photoUrl == null ? null : NetworkImage(photoUrl),
-          child: photoUrl == null
-              ? const Icon(
-                  Icons.person_rounded,
-                  color: AppColors.charcoal,
-                  size: 32,
-                )
-              : null,
+          child: Icon(
+            Icons.person_rounded,
+            color: AppColors.charcoal,
+            size: 32,
+          ),
         ),
         title: Text(
           _savedName ?? user?.displayName ?? widget.userName,
@@ -391,11 +459,11 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           style: const TextStyle(color: AppColors.mist),
         ),
         trailing: IconButton(
-          tooltip: 'Edit nama',
-          onPressed: _loading ? null : () => _editName(user),
+          tooltip: 'Pengaturan akun',
+          onPressed: _loading ? null : () => _accountSettings(user),
           icon: const Icon(Icons.edit_rounded, color: Colors.white),
         ),
-        onTap: _loading ? null : () => _editName(user),
+        onTap: _loading ? null : () => _accountSettings(user),
       ),
     );
   }
@@ -460,6 +528,17 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
                 ),
               );
             },
+          ),
+          _menuTile(
+            icon: Icons.privacy_tip_outlined,
+            title: 'Kebijakan Privasi',
+            subtitle: 'Cara Jajanku menggunakan dan menyimpan data',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const PrivacyPolicyScreen(),
+              ),
+            ),
           ),
           _menuTile(
             icon: Icons.help_outline,

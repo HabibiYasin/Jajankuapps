@@ -37,8 +37,8 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
       user == null ? 'guest_profile_name' : 'profile_name_${user.uid}',
     );
     final name = [
-      savedName,
       user?.displayName,
+      savedName,
       'Jajaners',
     ].whereType<String>().firstWhere((value) => value.trim().isNotEmpty).trim();
     return SpendingCardRenderer.render(

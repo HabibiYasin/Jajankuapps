@@ -217,7 +217,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       budget: budget,
                       monthly: monthly,
                       previousSpent: previousSpent,
-                    ).comparison!,
+                    ).comparison!.replaceFirst(
+                      RegExp(
+                        r'\. (Kemarin|Bulan kemarin) belum nyatet kali\.$',
+                      ),
+                      '',
+                    ),
                     style: const TextStyle(fontSize: 11, color: AppColors.teal),
                   ),
                 ],
