@@ -14,6 +14,7 @@ import 'login_screen.dart';
 import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'notification_settings_screen.dart';
 
 enum UserTier {
   guest('Jajaners CobaCoba'),
@@ -47,11 +48,6 @@ class PersonalizationScreen extends StatefulWidget {
 
 class _PersonalizationScreenState extends State<PersonalizationScreen> {
   bool _loading = false;
-  bool? _notificationsEnabled;
-  bool? _noonEnabled;
-  bool _savingNoon = false;
-  bool _savingNotifications = false;
-  bool _notificationLoadFailed = false;
   String? _savedName;
   int _nameGeneration = 0;
   StreamSubscription<User?>? _authSubscription;
@@ -59,63 +55,10 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
   @override
   void initState() {
     super.initState();
-    if (BudgetNotificationService.isSupported) _loadNotifications();
     final auth = AuthService.instance;
     _loadSavedName(auth.currentUser);
     if (auth.isConfigured) {
       _authSubscription = auth.authStateChanges.listen(_loadSavedName);
-    }
-  }
-
-  Future<void> _loadNotifications() async {
-    try {
-      final enabled = await BudgetNotificationService.isEnabled();
-      final noonEnabled = await BudgetNotificationService.isNoonEnabled();
-      if (mounted) {
-        setState(() {
-          _notificationsEnabled = enabled;
-          _noonEnabled = noonEnabled;
-          _notificationLoadFailed = false;
-        });
-      }
-    } catch (error) {
-      if (mounted) setState(() => _notificationLoadFailed = true);
-    }
-  }
-
-  Future<void> _toggleNotifications(bool enabled) async {
-    setState(() => _savingNotifications = true);
-    try {
-      await BudgetNotificationService.setEnabled(enabled);
-      if (mounted) setState(() => _notificationsEnabled = enabled);
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pengaturan notifikasi gagal disimpan. Coba lagi.'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _savingNotifications = false);
-    }
-  }
-
-  Future<void> _toggleNoon(bool enabled) async {
-    setState(() => _savingNoon = true);
-    try {
-      await BudgetNotificationService.setNoonEnabled(enabled);
-      if (mounted) setState(() => _noonEnabled = enabled);
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pengingat jam 12 gagal disimpan. Coba lagi.'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _savingNoon = false);
     }
   }
 
@@ -547,39 +490,15 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
             onTap: () => showTutorialDialog(context),
           ),
           if (BudgetNotificationService.isSupported)
-            Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    secondary: const Icon(Icons.notifications_active_outlined),
-                    title: const Text('Notifikasi persistent'),
-                    subtitle: const Text(
-                      'Tampilkan progres budget harian di panel notifikasi.',
-                    ),
-                    value: _notificationsEnabled ?? true,
-                    onChanged:
-                        _notificationsEnabled == null || _savingNotifications
-                        ? null
-                        : _toggleNotifications,
-                  ),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.wb_sunny_outlined),
-                    title: const Text('Pengingat jam 12 siang'),
-                    subtitle: const Text(
-                      'Cek persentase budget terpakai setiap pukul 12.00.',
-                    ),
-                    value: _noonEnabled ?? true,
-                    onChanged: _noonEnabled == null || _savingNoon
-                        ? null
-                        : _toggleNoon,
-                  ),
-                  if (_notificationLoadFailed)
-                    TextButton(
-                      onPressed: _loadNotifications,
-                      child: const Text('Coba muat pengaturan notifikasi lagi'),
-                    ),
-                ],
+            _menuTile(
+              icon: Icons.notifications_outlined,
+              title: 'Notifikasi',
+              subtitle: 'Atur notifikasi persistent dan pengingat jam 12 siang',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationSettingsScreen(),
+                ),
               ),
             ),
           const SizedBox(height: 12),

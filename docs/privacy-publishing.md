@@ -1,27 +1,11 @@
 # Publikasi kebijakan privasi
 
-Draf kebijakan berada di `assets/legal/privacy_policy.md` dan `public/privacy.html`.
-Menu Personalisasi menampilkan versi lokal sehingga tetap bisa dibaca tanpa internet.
+Sumber kebijakan aplikasi: `assets/legal/privacy_policy.md`, versi 7 Oktober 2026. Pengelola: Spizartel. Email: contact@spizartel.biz.id.
 
-Sebelum deploy, lengkapi nama pengelola dan email bantuan di kedua dokumen,
-hapus penanda DRAF, dan tinjau kesesuaian isi dengan operasional aplikasi.
-Jangan mengunggah dokumen dengan placeholder kontak ke Play Console.
+Menu Personalisasi menampilkan aset lokal sehingga dapat dibaca tanpa internet. Salinan HTML ada di `public/privacy.html` dan website `D:/Jajanku/Web_jajanku/jajanku/privacy.html` serta `jajanku/privacy/index.html`.
 
-Firebase Hosting sudah dikonfigurasi untuk folder `public` dengan clean URLs.
-Setelah isi final, deploy dengan:
+URL resmi: https://spizartel.biz.id/jajanku/privacy
 
-```
-firebase deploy --only hosting --project jajanku-26976
-```
+Upload website Web_jajanku ke document root domain. Folder privacy/index.html menyediakan URL tanpa ekstensi pada hosting statis; server dapat mengalihkan /privacy ke /privacy/. Halaman privacy.html tetap tersedia untuk kompatibilitas.
 
-Alamat yang diharapkan setelah deploy adalah
-`https://jajanku-26976.web.app/privacy`.
-Alamat ini belum diverifikasi aktif; uji akses tanpa login sebelum dimasukkan ke Play Console.
-Publikasi halaman ini tidak otomatis melengkapi form Data Safety maupun halaman
-permintaan penghapusan akun. Keduanya tetap perlu disiapkan sesuai perilaku aplikasi.
-
-Referensi penyusunan:
-- https://firebase.google.com/support/privacy
-- https://developers.google.com/ml-kit/android-data-disclosure
-- https://developers.google.com/ml-kit/terms
-- https://support.google.com/googleplay/android-developer/answer/18258653
+Firebase Hosting lama tetap menyediakan salinan public/privacy.html dengan clean URLs jika dideploy. Publikasi website tidak otomatis memperbarui aplikasi terpasang; aset kebijakan baru disertakan saat aplikasi dibangun ulang.

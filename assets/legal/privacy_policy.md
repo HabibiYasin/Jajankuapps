@@ -1,58 +1,242 @@
 # Kebijakan Privasi Jajanku
 
-DRAF ? identitas pengelola dan kontak belum dilengkapi.
+**Terakhir diperbarui: 7 Oktober 2026**
 
-Terakhir diperbarui: 6 Oktober 2026
+Kebijakan Privasi ini menjelaskan bagaimana **Jajanku**, yang dikembangkan dan dikelola oleh **Spizartel**, mengumpulkan, menggunakan, menyimpan, dan melindungi informasi pengguna saat menggunakan aplikasi Jajanku.
 
-## Tentang kebijakan ini
+Kebijakan Privasi resmi Jajanku tersedia di:
 
-Kebijakan ini menjelaskan bagaimana Jajanku memproses data untuk membantu pengguna mencatat pengeluaran dan mengatur budget.
+**https://spizartel.biz.id/jajanku/privacy**
 
-## Data akun
+Dengan menggunakan Jajanku, kamu memahami bahwa data akan diproses sebagaimana dijelaskan dalam Kebijakan Privasi ini.
 
-Saat kamu mendaftar atau login, Firebase Authentication memproses email, identitas akun, metode login, dan informasi autentikasi. Jajanku menyimpan email, nama tampilan, metode login, paket akun, waktu pembuatan akun, dan waktu login terakhir. Aplikasi juga mencatat waktu pertama kali dijalankan yang terdeteksi dan waktu terakhir dibuka, termasuk catatan per instalasi dengan pengenal acak. Waktu pertama terdeteksi tidak selalu sama dengan waktu pemasangan oleh sistem, terutama pada pengguna lama atau setelah pemulihan data perangkat. Aplikasi tidak dapat mencatat waktu uninstall sendiri. Password dikelola oleh Firebase Authentication dan tidak disimpan sebagai teks di database transaksi Jajanku.
+## Tentang Jajanku
 
-## Catatan pengeluaran dan budget
+Jajanku adalah aplikasi pencatatan pengeluaran dan pengelolaan budget yang membantu pengguna mencatat transaksi, mengelompokkan pengeluaran, memantau budget, serta melihat ringkasan keuangan pribadi.
 
-Data yang kamu masukkan mencakup nama merchant, nominal, tanggal dan waktu transaksi, kategori, serta sumber transaksi. Pengaturan budget meliputi limit harian, mingguan, bulanan, dan kategori pilihan. Data ini dipakai untuk ringkasan, perbandingan, laporan, dan notifikasi budget. Jajanku tidak mengakses saldo rekening atau mengambil transaksi langsung dari bank.
+Jajanku tidak terhubung secara langsung ke rekening bank dan tidak mengambil saldo maupun riwayat transaksi secara otomatis dari rekening pengguna.
 
-## Gambar dan pengenalan teks
+## Data Akun
 
-Jajanku mengakses gambar yang kamu pilih atau bagikan ke aplikasi untuk membaca bukti transaksi. Pengenalan teks menggunakan Google ML Kit di perangkat. Fitur ini tidak mengunggah gambar bukti transaksi ke database Jajanku; catatan transaksi hasil pembacaan dapat disimpan ke cloud setelah login. SDK ML Kit dapat mengirim informasi perangkat, versi aplikasi, pengenal instalasi, metrik performa, konfigurasi API, dan kode kesalahan ke Google untuk diagnostik serta analisis penggunaan SDK.
+Saat kamu membuat akun atau login ke Jajanku, layanan autentikasi dapat memproses informasi seperti:
 
-## Penyimpanan lokal dan cloud
+- Alamat email
+- Nama tampilan
+- Identitas akun
+- Metode login
+- Informasi autentikasi
+- Waktu pembuatan akun
+- Waktu login terakhir
+- Informasi paket atau jenis akun
 
-Data Guest dan preferensi aplikasi disimpan di perangkat. Saat menggunakan akun, catatan transaksi, profil, dan pengaturan budget disimpan melalui Firebase Authentication dan Cloud Firestore untuk akses akun dan sinkronisasi. Cache data akun dapat tersimpan di perangkat agar aplikasi tetap bisa menampilkan data saat koneksi terbatas. Pemindahan transaksi Guest ke akun dilakukan melalui pilihan pengguna.
+Jajanku menggunakan **Firebase Authentication**, termasuk Google Sign-In apabila pengguna memilih login menggunakan akun Google.
 
-## Layanan pihak ketiga
+Password atau kredensial autentikasi dikelola oleh Firebase Authentication dan tidak disimpan sebagai teks biasa di database transaksi Jajanku.
 
-Jajanku memakai layanan Google, termasuk Firebase Authentication, Cloud Firestore, Google Sign-In, dan Google ML Kit. Layanan tersebut memproses data yang diperlukan untuk autentikasi, penyimpanan, keamanan, atau pengoperasian SDK. Infrastruktur penyedia layanan dapat memproses data di negara yang berbeda dari tempat kamu berada. Kebijakan penyedia layanan: https://firebase.google.com/support/privacy dan https://policies.google.com/privacy.
+Jika kamu menggunakan Jajanku tanpa login sebagai Guest, sebagian data dapat disimpan secara lokal di perangkat.
 
-## Izin dan notifikasi
+## Catatan Pengeluaran dan Budget
 
-Izin notifikasi digunakan untuk progres budget dan pengingat pukul 12 siang yang dapat dimatikan melalui Personalisasi atau pengaturan Android. Informasi nominal dapat terlihat di panel notifikasi atau layar kunci sesuai pengaturan perangkat. Akses gambar digunakan saat kamu memilih bukti transaksi, sedangkan akses penyimpanan yang tersedia pada perangkat tertentu digunakan untuk menyimpan hasil ekspor.
+Informasi yang kamu masukkan ke dalam Jajanku dapat mencakup:
 
-## Ekspor dan berbagi
+- Nama merchant atau tempat transaksi
+- Nominal transaksi
+- Tanggal dan waktu transaksi
+- Kategori transaksi
+- Sumber transaksi
+- Catatan transaksi
+- Informasi lain yang kamu tambahkan ke transaksi
 
-Jika kamu memilih ekspor atau bagikan, laporan dibuat dari catatan pengeluaran lalu disimpan atau dikirim ke aplikasi yang kamu pilih. Penerima laporan dapat melihat informasi yang tercantum di dalamnya. Pilihan Tutup nominal menyamarkan nominal pada gambar report; periksa kembali isi laporan sebelum membagikannya.
+Jajanku juga dapat menyimpan pengaturan budget seperti:
 
-## Keamanan
+- Budget harian
+- Budget mingguan
+- Budget bulanan
+- Budget berdasarkan kategori
 
-Akses data cloud dibatasi dengan autentikasi dan aturan akses berdasarkan pemilik akun. Komunikasi dengan layanan Firebase menggunakan koneksi terenkripsi. Keamanan juga bergantung pada perangkat dan akun yang kamu gunakan; jangan membagikan password atau tautan verifikasi kepada orang lain.
+Informasi tersebut digunakan untuk menyediakan fitur seperti ringkasan pengeluaran, perbandingan pengeluaran, laporan, analisis budget, dan notifikasi budget.
 
-## Penyimpanan dan penghapusan
+Jajanku **tidak meminta akses ke saldo rekening bank dan tidak mengambil transaksi langsung dari rekening bank, kartu debit, kartu kredit, atau dompet digital pengguna**.
 
-Data akun disimpan untuk menyediakan layanan sampai kamu menghapus catatan atau akun. Untuk menghapus akun, buka Personalisasi, klik nama, pilih Pengaturan akun lalu Hapus akun. Setelah verifikasi ulang, proses menghapus profil, transaksi, budget, riwayat import, dan akun autentikasi. Jika proses terputus, sebagian data dapat sudah terhapus dan kamu dapat mengulangi proses. Penghapusan akun tidak menghapus data Guest, file ekspor, atau salinan yang telah kamu bagikan. Data lokal dapat dihapus melalui pengaturan data aplikasi atau penghapusan aplikasi. Log operasional atau cadangan yang dikelola penyedia layanan mengikuti kebijakan retensi penyedia tersebut.
+Transaksi hanya dicatat berdasarkan informasi yang diberikan, dipilih, atau dikonfirmasi oleh pengguna.
 
-## Pilihan pengguna
+## Gambar dan Pengenalan Teks
 
-Kamu dapat mengubah nama dan budget, menghapus transaksi, mengatur notifikasi, mengekspor catatan, atau menghapus akun. Untuk pertanyaan privasi atau permintaan penghapusan dari luar aplikasi, hubungi kontak pengelola pada bagian berikut. Identitas pemohon perlu diverifikasi sebelum data akun dihapus.
+Jajanku dapat mengakses gambar yang kamu pilih atau bagikan ke aplikasi, misalnya screenshot atau bukti transaksi, untuk membantu membaca informasi transaksi.
 
-## Perubahan kebijakan
+Pengenalan teks dilakukan menggunakan **Google ML Kit**.
 
-Kebijakan ini dapat diperbarui jika fitur atau cara pemrosesan data berubah. Versi terbaru dan tanggal pembaruan akan ditampilkan pada halaman ini.
+Pemrosesan utama gambar untuk pengenalan teks dilakukan di perangkat.
 
-## Kontak pengelola
+Jajanku tidak menyimpan atau mengunggah gambar bukti transaksi tersebut ke database cloud Jajanku sebagai bagian dari proses pencatatan transaksi, kecuali apabila suatu fitur di masa mendatang secara jelas meminta persetujuan pengguna untuk melakukan hal tersebut.
 
-Nama pengelola: [MENUNGGU NAMA DEVELOPER]
-Email bantuan dan privasi: [MENUNGGU EMAIL BANTUAN]
+Hasil pembacaan teks, seperti nama merchant, nominal, atau tanggal transaksi, dapat digunakan untuk membuat catatan transaksi dan dapat disimpan ke akun pengguna apabila pengguna memilih untuk menyimpannya.
+
+Google ML Kit atau SDK Google terkait dapat mengumpulkan informasi teknis tertentu, seperti informasi perangkat, versi aplikasi, pengenal instalasi, konfigurasi API, metrik performa, serta informasi kesalahan untuk keperluan diagnostik, keamanan, dan pengoperasian layanan.
+
+## Penyimpanan Lokal dan Cloud
+
+Jajanku menggunakan kombinasi penyimpanan lokal dan penyimpanan cloud.
+
+Untuk pengguna Guest, data transaksi dan preferensi tertentu dapat disimpan secara lokal di perangkat.
+
+Untuk pengguna yang menggunakan akun, beberapa informasi dapat disimpan melalui layanan Google Firebase, termasuk:
+
+- Profil pengguna
+- Catatan transaksi
+- Pengaturan budget
+- Preferensi tertentu
+- Riwayat terkait proses impor transaksi
+
+Cache data akun juga dapat tersimpan di perangkat agar aplikasi tetap dapat menampilkan informasi ketika koneksi internet terbatas.
+
+Jika pengguna memilih untuk memindahkan transaksi dari mode Guest ke akun, pemindahan tersebut hanya dilakukan berdasarkan tindakan atau pilihan pengguna.
+
+## Layanan Pihak Ketiga
+
+Untuk menjalankan beberapa fungsi aplikasi, Jajanku menggunakan layanan pihak ketiga yang disediakan oleh Google, termasuk:
+
+- Firebase Authentication
+- Cloud Firestore
+- Google Sign-In
+- Google ML Kit
+
+Layanan tersebut dapat memproses informasi yang diperlukan untuk autentikasi, penyimpanan data, keamanan, diagnostik, serta pengoperasian fitur aplikasi.
+
+Data dapat diproses menggunakan infrastruktur penyedia layanan yang berada di negara atau wilayah yang berbeda dari lokasi pengguna.
+
+Informasi lebih lanjut mengenai kebijakan privasi layanan Google dapat dilihat melalui:
+
+https://firebase.google.com/support/privacy
+
+https://policies.google.com/privacy
+
+## Izin Aplikasi
+
+Jajanku hanya meminta izin perangkat yang diperlukan untuk menyediakan fitur tertentu.
+
+Izin tersebut dapat mencakup:
+
+### Notifikasi
+
+Digunakan untuk menampilkan informasi seperti progres budget dan pengingat yang telah diaktifkan pengguna.
+
+Pengingat dapat dinonaktifkan melalui menu Personalisasi di Jajanku atau melalui pengaturan notifikasi Android.
+
+Jika notifikasi menampilkan informasi transaksi atau budget, sebagian informasi seperti nominal dapat terlihat pada panel notifikasi atau layar kunci sesuai pengaturan perangkat pengguna.
+
+### Gambar atau Media
+
+Digunakan ketika pengguna memilih screenshot atau gambar bukti transaksi untuk diproses oleh Jajanku.
+
+### Penyimpanan
+
+Pada perangkat atau versi Android tertentu, akses penyimpanan dapat digunakan untuk menyimpan hasil ekspor yang dibuat oleh pengguna.
+
+Jajanku tidak menggunakan izin tersebut untuk mengakses file yang tidak diperlukan untuk fungsi yang dipilih pengguna.
+
+## Ekspor dan Berbagi
+
+Jajanku menyediakan fitur yang memungkinkan pengguna membuat, menyimpan, atau membagikan laporan pengeluaran.
+
+Jika kamu memilih fitur ekspor atau bagikan, laporan dibuat berdasarkan data transaksi yang tersimpan di Jajanku.
+
+Setelah laporan dibagikan ke aplikasi atau pihak lain, penerima laporan dapat melihat informasi yang terdapat di dalam laporan tersebut.
+
+Jajanku dapat menyediakan pilihan untuk menyamarkan nominal pada laporan atau gambar yang dibagikan.
+
+Pengguna disarankan untuk memeriksa kembali isi laporan sebelum membagikannya.
+
+Jajanku tidak bertanggung jawab atas penggunaan data setelah pengguna secara sadar membagikannya kepada pihak lain.
+
+## Keamanan Data
+
+Jajanku menggunakan langkah-langkah yang wajar untuk membantu melindungi informasi pengguna.
+
+Akses data cloud dibatasi menggunakan autentikasi pengguna dan aturan akses berdasarkan kepemilikan akun.
+
+Komunikasi antara aplikasi dan layanan Firebase menggunakan koneksi terenkripsi yang disediakan oleh layanan tersebut.
+
+Namun, tidak ada metode penyimpanan atau transmisi data elektronik yang dapat menjamin keamanan secara mutlak.
+
+Keamanan akun juga bergantung pada pengguna. Jangan membagikan password, kode autentikasi, atau tautan verifikasi kepada orang lain.
+
+## Penyimpanan dan Penghapusan Data
+
+Data akun disimpan selama diperlukan untuk menyediakan layanan Jajanku atau sampai pengguna menghapus data atau akun tersebut.
+
+Pengguna dapat menghapus transaksi tertentu langsung melalui aplikasi.
+
+Untuk menghapus akun Jajanku:
+
+**Personalisasi → pilih nama akun → Pengaturan Akun → Hapus Akun**
+
+Pengguna mungkin diminta melakukan autentikasi ulang sebelum proses penghapusan dapat dilakukan.
+
+Proses penghapusan akun dirancang untuk menghapus data yang terkait dengan akun, termasuk:
+
+- Profil pengguna
+- Catatan transaksi
+- Pengaturan budget
+- Riwayat impor yang terkait dengan akun
+- Akun autentikasi Jajanku
+
+Apabila proses penghapusan terganggu, misalnya karena koneksi internet terputus, sebagian proses mungkin perlu dijalankan kembali.
+
+Penghapusan akun cloud tidak secara otomatis menghapus:
+
+- Data Guest yang tersimpan lokal pada perangkat
+- File hasil ekspor yang telah disimpan
+- Screenshot yang tersimpan di perangkat
+- Laporan atau data yang sebelumnya telah dibagikan ke aplikasi atau pihak lain
+
+Data lokal Jajanku dapat dihapus melalui fitur aplikasi yang tersedia, pengaturan penyimpanan aplikasi Android, atau dengan menghapus aplikasi dari perangkat.
+
+Log teknis, diagnostik, atau cadangan yang dikelola oleh penyedia layanan pihak ketiga dapat memiliki periode penyimpanan tersendiri sesuai kebijakan penyedia layanan tersebut.
+
+## Pilihan dan Kontrol Pengguna
+
+Jajanku memberikan pengguna kontrol terhadap sejumlah informasi dan fitur aplikasi.
+
+Pengguna dapat, sesuai fitur yang tersedia:
+
+- Mengubah nama atau profil
+- Mengatur budget
+- Menambah, mengubah, atau menghapus transaksi
+- Mengatur notifikasi
+- Menggunakan atau menonaktifkan pengingat
+- Mengekspor catatan
+- Membagikan laporan
+- Menghapus akun
+
+Untuk pertanyaan mengenai privasi atau permintaan penghapusan data yang tidak dapat dilakukan melalui aplikasi, pengguna dapat menghubungi Spizartel melalui alamat email yang tercantum pada bagian Kontak.
+
+Untuk melindungi data pengguna, kami dapat meminta verifikasi identitas atau kepemilikan akun sebelum memproses permintaan terkait data akun.
+
+## Privasi Anak
+
+Jajanku tidak secara khusus ditujukan untuk mengumpulkan data pribadi anak-anak.
+
+Jika kami mengetahui bahwa data pribadi anak telah dikumpulkan secara tidak semestinya melalui layanan Jajanku, kami akan mengambil langkah yang wajar untuk menanganinya sesuai ketentuan yang berlaku.
+
+## Perubahan Kebijakan Privasi
+
+Kebijakan Privasi ini dapat diperbarui dari waktu ke waktu, misalnya jika terdapat perubahan pada fitur Jajanku, teknologi yang digunakan, layanan pihak ketiga, atau cara data diproses.
+
+Tanggal **Terakhir diperbarui** pada bagian atas halaman akan diperbarui ketika terdapat perubahan pada Kebijakan Privasi ini.
+
+Versi terbaru Kebijakan Privasi selalu dapat dilihat melalui:
+
+**https://spizartel.biz.id/jajanku/privacy**
+
+Pengguna disarankan untuk meninjau halaman ini secara berkala.
+
+## Kontak
+
+Jajanku dikembangkan dan dikelola oleh:
+
+**Developer / Pengelola:** Spizartel  
+**Email bantuan dan privasi:** contact@spizartel.biz.id  
+**Kebijakan Privasi:** https://spizartel.biz.id/jajanku/privacy
+
+Untuk pertanyaan mengenai Kebijakan Privasi, penggunaan data, atau permintaan terkait data pribadi, silakan hubungi kami melalui email tersebut.
