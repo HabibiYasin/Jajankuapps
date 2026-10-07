@@ -30,6 +30,10 @@ class TransactionClassifier {
             ...transactionKeywords,
             // A grocery product, not a ready-to-drink beverage.
             ('susu formula', 'Belanja', 3),
+            // Keep established merchant recognition despite contextual labels
+            // in the expanded workbook.
+            ('a&w', 'Makanan', 2),
+            ('h&m', 'Belanja', 2),
           ]
           .map(
             (entry) => (

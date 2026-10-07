@@ -5,7 +5,7 @@ mengekstrak merchant dan nominal. Kategori bawaan parser bank tidak lagi
 menentukan kategori hasil scan. Kategori yang sudah tersimpan tidak diubah
 otomatis, termasuk pilihan manual pengguna.
 
-Kamus offline berasal dari `Jajanku_1400_Keyword_Transaksi.xlsx`: 200 keyword
+Kamus offline berasal dari `Jajanku_7000_Keyword_Transaksi.xlsx`: 1.000 keyword
 untuk masing-masing tujuh kategori. Versi yang dikompilasi beserta SHA-256
 sumber ada di `lib/data/transaction_keywords.dart`. Kolom catatan/panduan
 dalam spreadsheet tidak diimpor sebagai instruksi atau kode.
@@ -13,7 +13,7 @@ dalam spreadsheet tidak diimpor sebagai instruksi atau kode.
 Regenerasi dengan Python standar, lalu format Dart:
 
 ```powershell
-python tool/import_transaction_keywords.py 'C:/Users/User1/Downloads/Jajanku_1400_Keyword_Transaksi.xlsx'
+python tool/import_transaction_keywords.py 'C:/Users/User1/Downloads/Jajanku_7000_Keyword_Transaksi.xlsx'
 dart format lib/data/transaction_keywords.dart
 ```
 
@@ -29,7 +29,9 @@ dikenal atau merchant umum seperti Indomaret. Nama pengirim, metode bayar,
 nama bank, footer, serta teks promosi di luar detail tersebut tidak dipakai.
 Keyword kontekstual seperti Gojek, top up, atau nama orang bukan bukti tunggal
 yang cukup. Pengecualian retailer dan kata ambigu tercatat di classifier.
-Tambahan kurasi di luar spreadsheet: `susu formula` → Belanja.
+Tambahan kurasi di luar spreadsheet: `susu formula` ke Belanja,
+`A&W` ke Makanan, dan `H&M` ke Belanja. Dua nama merchant tersebut tetap
+dikenali meski versi spreadsheet baru menandainya kontekstual.
 
 Pengujian mencakup seluruh keyword kuat secara terpisah, contoh merchant,
 batas kata, konflik kategori, detail pembayaran, serta integrasi parser.

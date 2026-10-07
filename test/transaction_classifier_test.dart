@@ -10,14 +10,14 @@ void main() {
         receiptText: receipt,
       ).category;
 
-  test('imports 1400 keywords, 200 per category, with consistent labels', () {
-    expect(transactionKeywords, hasLength(1400));
+  test('imports 7000 keywords, 1000 per category, with consistent labels', () {
+    expect(transactionKeywords, hasLength(7000));
     for (final category in TransactionClassifier.categories.where(
       (c) => c != 'Umum',
     )) {
       expect(
         transactionKeywords.where((entry) => entry.$2 == category),
-        hasLength(200),
+        hasLength(1000),
       );
     }
   });
