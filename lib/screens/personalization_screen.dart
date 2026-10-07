@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/auth_service.dart';
+import '../services/profile_avatar_store.dart';
 import '../services/account_data_service.dart';
 import '../services/budget_notification_service.dart';
 import '../theme/app_theme.dart';
@@ -48,6 +50,8 @@ class PersonalizationScreen extends StatefulWidget {
 
 class _PersonalizationScreenState extends State<PersonalizationScreen> {
   bool _loading = false;
+  int _avatarCode = 1;
+  StreamSubscription<int>? _avatarSubscription;
   String? _savedName;
   int _nameGeneration = 0;
   StreamSubscription<User?>? _authSubscription;
@@ -65,6 +69,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _avatarSubscription?.cancel();
     super.dispose();
   }
 
@@ -73,9 +78,27 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
 
   Future<void> _loadSavedName(User? user) async {
     final generation = ++_nameGeneration;
+    _avatarSubscription?.cancel();
+    _avatarSubscription = null;
+    if (user != null) {
+      _avatarSubscription = ProfileAvatarStore(FirebaseFirestore.instance)
+          .watch(user.uid)
+          .listen(
+            (code) {
+              if (mounted &&
+                  AuthService.instance.currentUser?.uid == user.uid) {
+                setState(() => _avatarCode = code);
+              }
+            },
+            onError: (Object error) {
+              debugPrint('Gagal memuat foto profil: $error');
+            },
+          );
+    }
     if (mounted) {
       setState(() {
         _savedName = null;
+        _avatarCode = 1;
       });
     }
     try {
@@ -86,6 +109,11 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           AuthService.instance.currentUser?.uid == user?.uid) {
         setState(() {
           _savedName = user?.displayName ?? savedName;
+          if (user == null) {
+            _avatarCode = ProfileAvatarStore.normalize(
+              prefs.getInt('guest_avatar_code'),
+            );
+          }
         });
       }
     } catch (error) {
@@ -112,6 +140,11 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
               title: const Text('Edit nama'),
               onTap: () => Navigator.pop(sheetContext, 'name'),
             ),
+            ListTile(
+              leading: const Icon(Icons.face_rounded),
+              title: const Text('Ganti foto profil'),
+              onTap: () => Navigator.pop(sheetContext, 'avatar'),
+            ),
             if (user != null)
               ListTile(
                 leading: const Icon(Icons.delete_forever_outlined),
@@ -130,6 +163,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
     );
     if (!mounted || AuthService.instance.currentUser?.uid != user?.uid) return;
     if (action == 'name') await _editName(user);
+    if (action == 'avatar') await _editAvatar(user);
     if (action == 'delete' && user != null && mounted) {
       await Navigator.push(
         context,
@@ -145,6 +179,117 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           builder: (_) => ChangePasswordScreen(user: user),
         ),
       );
+    }
+  }
+
+  Future<void> _editAvatar(User? user) async {
+    var selected = _avatarCode;
+    final code = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, updateDialog) => AlertDialog(
+          title: const Text('Pilih foto profil'),
+          content: SizedBox(
+            width: 320,
+            child: GridView.builder(
+              shrinkWrap: true,
+              itemCount: 6,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.8,
+              ),
+              itemBuilder: (_, index) {
+                final avatar = index + 1;
+                return Semantics(
+                  selected: selected == avatar,
+                  button: true,
+                  child: InkWell(
+                    onTap: () => updateDialog(() => selected = avatar),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected == avatar
+                              ? AppColors.teal
+                              : Colors.transparent,
+                          width: 3,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: ClipOval(
+                              child: Image.asset(
+                                ProfileAvatarStore.asset(avatar),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            ProfileAvatarStore.labels[index],
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, selected),
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (code == null ||
+        !mounted ||
+        AuthService.instance.currentUser?.uid != user?.uid) {
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      if (user != null) {
+        await AuthService.instance.updateAvatar(user.uid, code);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        if (AuthService.instance.currentUser != null) return;
+        if (!await prefs.setInt('guest_avatar_code', code)) {
+          throw StateError('Penyimpanan foto profil gagal.');
+        }
+      }
+      if (!mounted || AuthService.instance.currentUser?.uid != user?.uid) {
+        return;
+      }
+      setState(() => _avatarCode = code);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto profil berhasil disimpan')),
+      );
+    } catch (error) {
+      if (!mounted || AuthService.instance.currentUser?.uid != user?.uid) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Foto profil gagal disimpan. Periksa internet dan coba lagi.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -380,13 +525,11 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           horizontal: 20,
           vertical: 18,
         ),
-        leading: const CircleAvatar(
-          radius: 30,
-          backgroundColor: AppColors.aqua,
-          child: Icon(
-            Icons.person_rounded,
-            color: AppColors.charcoal,
-            size: 32,
+        leading: Semantics(
+          label: 'Foto profil ${ProfileAvatarStore.labels[_avatarCode - 1]}',
+          child: CircleAvatar(
+            radius: 30,
+            backgroundImage: AssetImage(ProfileAvatarStore.asset(_avatarCode)),
           ),
         ),
         title: Text(

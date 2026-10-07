@@ -56,7 +56,15 @@ async function query(uid, owner, expected) {
   await request('GET','users/profile-user','bob',undefined,403);
   assert.equal(await profileWrite('profile-user','vip'),403);
   assert.equal(await profileWrite('profile-user','free'),200);
-  await request('DELETE','users/profile-user','profile-user',undefined,403);
+  const avatarPath = 'users/profile-user?updateMask.fieldPaths=avatarCode';
+  for (let code = 1; code <= 6; code++) {
+    await request('PATCH', avatarPath, 'profile-user', {avatarCode:{integerValue:String(code)}});
+  }
+  for (const value of [{integerValue:'0'}, {integerValue:'7'}, {doubleValue:1.5}, {stringValue:'1'}]) {
+    await request('PATCH', avatarPath, 'profile-user', {avatarCode:value}, 403);
+  }
+  await request('PATCH', avatarPath, 'bob', {avatarCode:{integerValue:'1'}}, 403);
+  await request('DELETE','users/profile-user','profile-user');
   const tx = 'users/alice/transactions/one';
   await request('GET',tx,null,undefined,403);
   await request('PATCH',tx,null,transaction,403);
@@ -90,7 +98,7 @@ async function query(uid, owner, expected) {
   await request('PATCH',marker,'alice',{completed:{booleanValue:true}});
   await request('GET',marker,'alice');
   await request('GET',marker,'bob',undefined,403);
-  await request('DELETE',marker,'alice',undefined,403);
+  await request('DELETE',marker,'alice');
   await request('PATCH',marker,'alice',{completed:{booleanValue:false}},403);
   await request('PATCH','users/alice/anything/one','alice',{value:{booleanValue:true}},403);
   await request('DELETE',tx,'alice');

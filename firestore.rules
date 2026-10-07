@@ -26,12 +26,18 @@ service cloud.firestore {
         && (!('lastOpenedAt' in d) || d.lastOpenedAt is timestamp)
         && (!('deletedAt' in d) || d.deletedAt == null);
     }
+    function validAvatar() {
+      let d = request.resource.data;
+      return !('avatarCode' in d)
+        || (d.avatarCode is int && d.avatarCode >= 1 && d.avatarCode <= 6);
+    }
     match /users/{uid} {
       allow get, delete: if owns(uid);
       allow create: if owns(uid)
         && request.resource.data.keys().hasAll(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
-        && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt'])
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt', 'avatarCode'])
         && validActivity()
+        && validAvatar()
         && request.resource.data.plan == 'free'
         && request.resource.data.email is string
         && request.resource.data.displayName is string
@@ -40,8 +46,9 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.lastLoginAt == request.time;
       allow update: if owns(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'displayName', 'providers', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'displayName', 'providers', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt', 'avatarCode'])
         && validActivity()
+        && validAvatar()
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastOpenedAt']) || request.resource.data.lastOpenedAt == request.time)
         && (!('installedAt' in resource.data) || request.resource.data.installedAt == resource.data.installedAt)
         && request.resource.data.email is string

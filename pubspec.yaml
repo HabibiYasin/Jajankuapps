@@ -40,6 +40,7 @@ flutter:
     - assets/icon/
     - assets/share/
     - assets/splash/
+    - assets/avatars/
     - assets/mascot/
     - assets/legal/
 

@@ -22,7 +22,9 @@ void main() {
   ) async {
     await tester.pumpWidget(profileApp());
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Edit nama'));
+    await tester.tap(find.byTooltip('Pengaturan akun'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit nama'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '  Habibi  ');
     await tester.tap(find.text('Simpan'));
@@ -43,7 +45,9 @@ void main() {
     SharedPreferences.setMockInitialValues({'guest_profile_name': 'Habibi'});
     await tester.pumpWidget(profileApp());
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Edit nama'));
+    await tester.tap(find.byTooltip('Pengaturan akun'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit nama'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '   ');
     await tester.tap(find.text('Simpan'));

@@ -1,5 +1,6 @@
 import 'account_deletion_service.dart';
 import 'app_activity_service.dart';
+import 'profile_avatar_store.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -55,6 +56,9 @@ class AuthService {
         ...await AppActivityService.profileFields(snapshot.data()),
         'email': user.email ?? '',
         'displayName': savedName ?? user.displayName ?? '',
+        'avatarCode': ProfileAvatarStore.normalize(
+          snapshot.data()?['avatarCode'],
+        ),
         'providers': user.providerData.map((p) => p.providerId).toList(),
         'lastLoginAt': FieldValue.serverTimestamp(),
         if (!snapshot.exists) 'createdAt': FieldValue.serverTimestamp(),
@@ -81,6 +85,12 @@ class AuthService {
       'displayName': name.trim(),
       'lastLoginAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> updateAvatar(String uid, int code) async {
+    if (currentUser?.uid != uid) throw StateError('Akun berubah.');
+    await ProfileAvatarStore(FirebaseFirestore.instance).save(uid, code);
+    if (currentUser?.uid != uid) throw StateError('Akun berubah.');
   }
 
   Future<void> signInWithEmail(String email, String password) async {
