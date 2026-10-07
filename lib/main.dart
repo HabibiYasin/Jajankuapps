@@ -492,6 +492,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
           TransactionHistoryScreen(
             key: ValueKey('history-${_accountData.uid}'),
             history: _transactionHistory,
+            budgetLimits: _accountData.limits,
+            userName:
+                AuthService.instance.currentUser?.displayName ?? _userName,
             onDelete: (tx) => _performEdit(() => _accountData.delete(tx)),
             onUpdateDate: (tx, newDate) =>
                 _performEdit(() => _accountData.updateDate(tx, newDate)),

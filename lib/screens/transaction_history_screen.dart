@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 import '../services/transaction_classifier.dart';
 import '../services/export_service.dart';
+import '../models/budget_limits.dart';
+import '../services/monthly_report_service.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   final List<TransactionModel> history;
+  final BudgetLimits budgetLimits;
+  final String userName;
   final Function(TransactionModel) onDelete;
   final Function(TransactionModel, DateTime) onUpdateDate;
   final Function(TransactionModel) onUpdateTransaction;
@@ -13,6 +17,8 @@ class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({
     super.key,
     required this.history,
+    this.budgetLimits = const BudgetLimits(),
+    this.userName = 'Pengguna Jajanku',
     required this.onDelete,
     required this.onUpdateDate,
     required this.onUpdateTransaction,
@@ -26,6 +32,101 @@ class TransactionHistoryScreen extends StatefulWidget {
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _searchQuery = "";
   String _selectedCategory = "Semua";
+  int _selectedMonthOffset = -1;
+  String _sortOrder = 'Paling baru';
+  bool _exportingPdf = false;
+
+  Future<void> _downloadMonthlyReport() async {
+    final now = DateTime.now();
+    final available = <DateTime>{
+      DateTime(now.year, now.month),
+      ...widget.history.map((t) => DateTime(t.dateTime.year, t.dateTime.month)),
+    }.toList()..sort((a, b) => b.compareTo(a));
+    var selected = available.first;
+    final nameController = TextEditingController(text: widget.userName);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const Text('Laporan bulanan PDF'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  maxLength: 100,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama pada laporan',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<DateTime>(
+                  initialValue: selected,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Bulan laporan'),
+                  items: available
+                      .map(
+                        (m) => DropdownMenuItem(
+                          value: m,
+                          child: Text(MonthlyReportService.monthLabel(m)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (m) {
+                    if (m != null) update(() => selected = m);
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'PDF berisi ringkasan budget, grafik, perbandingan, rekap harian, dan rincian transaksi. Simpan PDF melalui menu berbagi.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Buat PDF'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final name = nameController.text.trim();
+    nameController.dispose();
+    if (confirmed != true || !mounted) return;
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box == null
+        ? const Rect.fromLTWH(0, 0, 1, 1)
+        : box.localToGlobal(Offset.zero) & box.size;
+    setState(() => _exportingPdf = true);
+    try {
+      await MonthlyReportService.export(
+        report: MonthlyReport(
+          history: widget.history,
+          month: selected,
+          limits: widget.budgetLimits,
+        ),
+        name: name,
+        shareOrigin: origin,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal membuat PDF. Silakan coba lagi.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportingPdf = false);
+    }
+  }
 
   void _showEditTransactionDialog(
     BuildContext context,
@@ -289,20 +390,56 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    List<TransactionModel> filteredHistory = widget.history.where((tx) {
-      bool matchesSearch = tx.merchant.toLowerCase().contains(
-        _searchQuery.toLowerCase(),
-      );
-      bool matchesCategory =
-          _selectedCategory == "Semua" || tx.category == _selectedCategory;
-      return matchesSearch && matchesCategory;
-    }).toList();
+    final now = DateTime.now();
+    final firstMonth = DateTime(now.year, now.month - 3);
+    final nextMonth = DateTime(now.year, now.month + 1);
+    final selectedMonth = DateTime(now.year, now.month - _selectedMonthOffset);
+    final filteredHistory =
+        widget.history.where((tx) {
+          bool matchesSearch = tx.merchant.toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          );
+          bool matchesCategory =
+              _selectedCategory == "Semua" || tx.category == _selectedCategory;
+          final matchesMonth = _selectedMonthOffset == -1
+              ? !tx.dateTime.isBefore(firstMonth) &&
+                    tx.dateTime.isBefore(nextMonth)
+              : tx.dateTime.year == selectedMonth.year &&
+                    tx.dateTime.month == selectedMonth.month;
+          return matchesSearch && matchesCategory && matchesMonth;
+        }).toList()..sort((a, b) {
+          final comparison = switch (_sortOrder) {
+            'Paling mahal' => b.numericNominal.compareTo(a.numericNominal),
+            'Paling murah' => a.numericNominal.compareTo(b.numericNominal),
+            'Paling lama' => a.dateTime.compareTo(b.dateTime),
+            _ => b.dateTime.compareTo(a.dateTime),
+          };
+          return comparison != 0
+              ? comparison
+              : b.dateTime.compareTo(a.dateTime);
+        });
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          FilledButton.icon(
+            onPressed: _exportingPdf ? null : _downloadMonthlyReport,
+            icon: _exportingPdf
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf),
+            label: Text(
+              _exportingPdf
+                  ? 'Membuat laporan PDF...'
+                  : 'Download Laporan Bulanan PDF',
+            ),
+          ),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -375,37 +512,75 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           ),
           const SizedBox(height: 12),
 
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['Semua', ...TransactionClassifier.categories].map((
-                category,
-              ) {
-                bool isSelected = _selectedCategory == category;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    selectedColor: Colors.teal,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.onSurface,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                    backgroundColor: Colors.grey.shade100,
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedCategory = category;
-                      });
-                    },
-                  ),
-                );
-              }).toList(),
+          DropdownButtonFormField<String>(
+            key: const ValueKey('history-category-filter'),
+            initialValue: _selectedCategory,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Kategori',
+              prefixIcon: Icon(Icons.category_outlined),
+              border: OutlineInputBorder(),
             ),
+            items: ['Semua', ...TransactionClassifier.categories]
+                .map(
+                  (category) =>
+                      DropdownMenuItem(value: category, child: Text(category)),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedCategory = value);
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            key: const ValueKey('history-month-filter'),
+            initialValue: _selectedMonthOffset,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Bulan',
+              prefixIcon: Icon(Icons.calendar_month_outlined),
+              border: OutlineInputBorder(),
+              helperText: 'Bulan ini dan maksimal 3 bulan sebelumnya.',
+            ),
+            items: [
+              const DropdownMenuItem(
+                value: -1,
+                child: Text('Semua bulan tersedia'),
+              ),
+              for (var offset = 0; offset <= 3; offset++)
+                DropdownMenuItem(
+                  value: offset,
+                  child: Text(
+                    MonthlyReportService.monthLabel(
+                      DateTime(now.year, now.month - offset),
+                    ),
+                  ),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedMonthOffset = value);
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: const ValueKey('history-sort-order'),
+            initialValue: _sortOrder,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Urutkan berdasarkan',
+              prefixIcon: Icon(Icons.sort),
+              border: OutlineInputBorder(),
+            ),
+            items:
+                ['Paling mahal', 'Paling murah', 'Paling baru', 'Paling lama']
+                    .map(
+                      (order) =>
+                          DropdownMenuItem(value: order, child: Text(order)),
+                    )
+                    .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _sortOrder = value);
+            },
           ),
           const SizedBox(height: 12),
 
