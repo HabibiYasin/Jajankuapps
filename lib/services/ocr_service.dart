@@ -5,6 +5,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 
 import '../models/transaction_model.dart';
 import 'qris_parser.dart';
+import 'parsers/general_parser.dart';
 
 class OcrService {
   static Future<TransactionModel> processImage(File imageFile) async {
@@ -18,21 +19,11 @@ class OcrService {
       String formattedText = extractSpatialText(recognizedText);
 
       final transaction = QrisParser.parseReceipt(formattedText);
-      DateTime receiptDateTime = extractDateTimeFromOCR(formattedText);
-
-      textRecognizer.close();
-
-      return TransactionModel(
-        merchant: transaction.merchant,
-        category: transaction.category,
-        nominalStr: transaction.nominalStr,
-        numericNominal: transaction.numericNominal,
-        dateTime: receiptDateTime,
-        source: transaction.source,
-      );
+      return transaction;
     } catch (e) {
-      textRecognizer.close();
       throw Exception("Gagal memproses gambar: $e");
+    } finally {
+      await textRecognizer.close();
     }
   }
 
@@ -150,6 +141,14 @@ class OcrService {
   }
 
   static DateTime extractDateTimeFromOCR(String recognizedText) {
+    final parsed = GeneralParser.extractDateTime(
+      recognizedText
+          .split(RegExp(r'[\r\n]+'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList(),
+    );
+    if (parsed != null) return parsed;
     final dateRegexIso = RegExp(r'\b(\d{4})-(\d{2})-(\d{2})\b');
     final dateRegexNumeric = RegExp(
       r'\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b',
