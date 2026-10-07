@@ -63,16 +63,19 @@ void main() {
     );
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Simpan Pengeluaran'));
     await tester.tap(find.text('Simpan Pengeluaran'));
     await tester.pumpAndSettle();
     expect(find.text('Isi nama pengeluaran.'), findsOneWidget);
     expect(find.text('Isi nominal lebih dari 0.'), findsOneWidget);
     await tester.enterText(find.byType(TextFormField).at(0), 'Makan siang');
     await tester.enterText(find.byType(TextFormField).at(1), '25000');
+    await tester.ensureVisible(find.text('Simpan Pengeluaran'));
     await tester.tap(find.text('Simpan Pengeluaran'));
     await tester.pumpAndSettle();
     expect(saved?.merchant, 'Makan siang');
     expect(saved?.numericNominal, 25000);
-    expect(saved?.source, 'Manual');
+    expect(saved?.source, 'Tunai');
+    expect(saved?.paymentMethod, 'Cash');
   });
 }

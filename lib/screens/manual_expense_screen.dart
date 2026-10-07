@@ -15,6 +15,8 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _merchant = TextEditingController();
   final _amount = TextEditingController();
+  final _source = TextEditingController(text: 'Tunai');
+  String _paymentMethod = 'Cash';
   String _category = 'Umum';
   DateTime _date = DateTime.now();
 
@@ -22,6 +24,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
   void dispose() {
     _merchant.dispose();
     _amount.dispose();
+    _source.dispose();
     super.dispose();
   }
 
@@ -55,7 +58,8 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
         numericNominal: amount,
         category: _category,
         dateTime: _date,
-        source: 'Manual',
+        source: _source.text.trim(),
+        paymentMethod: _paymentMethod,
       ),
     );
   }
@@ -110,6 +114,32 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _category = value!),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _paymentMethod,
+              decoration: const InputDecoration(labelText: 'Metode Pembayaran'),
+              items: TransactionModel.paymentMethods
+                  .map(
+                    (method) =>
+                        DropdownMenuItem(value: method, child: Text(method)),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => _paymentMethod = value);
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _source,
+              maxLength: 200,
+              decoration: const InputDecoration(
+                labelText: 'Sumber Uang',
+                hintText: 'Contoh: BCA, DANA, Tunai',
+              ),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Isi sumber uang.'
+                  : null,
             ),
             const SizedBox(height: 16),
             ListTile(

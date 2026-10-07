@@ -390,18 +390,40 @@ class MonthlyReportService {
       ),
     ]);
     page([
-      title('06. Rincian seluruh transaksi'),
+      title('06. Rekap metode pembayaran'),
+      table(
+        ['Metode', 'Transaksi', 'Total'],
+        [
+          for (final method in TransactionModel.paymentMethods)
+            [
+              method,
+              '${r.transactions.where((t) => t.paymentMethod == method).length}',
+              money(
+                MonthlyReport.sum(
+                  r.transactions.where((t) => t.paymentMethod == method),
+                ),
+              ),
+            ],
+        ],
+      ),
+      title('07. Rincian seluruh transaksi'),
       if (r.transactions.isEmpty)
         text('Tidak ada transaksi tercatat.')
       else
         table(
-          ['Tanggal / jam', 'Toko', 'Kategori / sumber', 'Nominal', 'Budget'],
+          [
+            'Tanggal / jam',
+            'Toko',
+            'Kategori / sumber uang / metode',
+            'Nominal',
+            'Budget',
+          ],
           [
             for (final t in r.transactions)
               [
                 t.formattedTime,
                 short(t.merchant),
-                '${short(t.category)} / ${short(t.source)}',
+                '${short(t.category)} / ${short(t.source)} / ${t.paymentMethod}',
                 money(t.numericNominal),
                 r.limits.includes(t) ? 'Ya' : 'Tidak',
               ],

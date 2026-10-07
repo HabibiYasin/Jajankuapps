@@ -255,6 +255,7 @@ class AccountDataService extends ChangeNotifier {
           'merchant': tx.merchant,
           'category': tx.category,
           'source': tx.source,
+          'paymentMethod': tx.paymentMethod,
         }),
       );
     }
@@ -337,6 +338,7 @@ class AccountDataService extends ChangeNotifier {
                 dateTime: DateTime.parse(row['dateTime'] as String),
                 category: row['category'] as String,
                 source: (row['source'] as String?) ?? 'QRIS Umum',
+                paymentMethod: (row['paymentMethod'] as String?) ?? 'QRIS',
                 numericNominal: (row['numericNominal'] as num).toDouble(),
               ),
             )

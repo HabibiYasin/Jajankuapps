@@ -1,4 +1,6 @@
 class TransactionModel {
+  static const paymentMethods = ['QRIS', 'Transfer', 'VA', 'Cash'];
+  String paymentMethod;
   final String? cloudId;
   final String? ownerUid;
   int? id; // Tambahkan ID untuk referensi ke database
@@ -13,6 +15,7 @@ class TransactionModel {
     this.cloudId,
     this.ownerUid,
     this.id,
+    this.paymentMethod = 'QRIS',
     required this.merchant,
     required this.nominalStr,
     required this.dateTime,

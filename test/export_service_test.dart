@@ -1,4 +1,4 @@
-﻿import 'package:excel/excel.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_application_1/models/transaction_model.dart';
 import 'package:flutter_application_1/services/export_service.dart';
@@ -32,10 +32,15 @@ void main() {
           transaction('Bus', 'Transport', 5000, DateTime(2026, 10, 2)),
         ]),
       );
-      expect(workbook.tables.keys, ['Transaksi', 'Kategori', 'Bulanan']);
+      expect(workbook.tables.keys, [
+        'Transaksi',
+        'Kategori',
+        'Bulanan',
+        'Metode Pembayaran',
+      ]);
       final rows = workbook['Transaksi'].rows;
       expect(rows.length, 4);
-      expect(rows[1].length, 6);
+      expect(rows[1].length, 7);
       expect(rows[1][1]!.value, TextCellValue('Warung; "Enak",\nJakarta'));
       expect(rows[1][3]!.value, DoubleCellValue(12500.5));
       expect(rows[2][1]!.value, TextCellValue('=SUM(A1:A2)'));
@@ -51,4 +56,3 @@ void main() {
     },
   );
 }
-

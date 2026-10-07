@@ -18,6 +18,7 @@ class CloudAccountStore {
     'dateTime': Timestamp.fromDate(tx.dateTime),
     'category': tx.category,
     'source': tx.source,
+    'paymentMethod': tx.paymentMethod,
     'numericNominal': tx.numericNominal,
   };
 
@@ -34,6 +35,7 @@ class CloudAccountStore {
       dateTime: (map['dateTime'] as Timestamp).toDate(),
       category: map['category'] as String,
       source: map['source'] as String,
+      paymentMethod: (map['paymentMethod'] as String?) ?? 'QRIS',
       numericNominal: (map['numericNominal'] as num).toDouble(),
     );
   }

@@ -17,7 +17,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
-    const int dbVersion = 3;
+    const int dbVersion = 4;
     final path = join(dbPath, filePath);
 
     return await openDatabase(
@@ -38,6 +38,7 @@ class DatabaseHelper {
         dateTime TEXT,
         category TEXT,
         source TEXT,
+        paymentMethod TEXT NOT NULL DEFAULT 'QRIS',
         numericNominal REAL
       )
     ''');
@@ -57,6 +58,11 @@ class DatabaseHelper {
       );
     }
     if (oldVersion < 3) await _createMigrationTable(db);
+    if (oldVersion < 4) {
+      await db.execute(
+        "ALTER TABLE transactions ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT 'QRIS'",
+      );
+    }
   }
 
   // CREATE: Simpan Transaksi Baru
@@ -68,6 +74,7 @@ class DatabaseHelper {
       'dateTime': tx.dateTime.toIso8601String(),
       'category': tx.category,
       'source': tx.source,
+      'paymentMethod': tx.paymentMethod,
       'numericNominal': tx.numericNominal,
     });
   }
@@ -90,6 +97,7 @@ class DatabaseHelper {
             dateTime: DateTime.parse(json['dateTime'] as String),
             category: json['category'] as String,
             source: (json['source'] as String?) ?? 'QRIS Umum',
+            paymentMethod: (json['paymentMethod'] as String?) ?? 'QRIS',
             numericNominal: json['numericNominal'] as double,
           ),
         )
@@ -153,7 +161,12 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.update(
       'transactions',
-      {'merchant': tx.merchant, 'category': tx.category, 'source': tx.source},
+      {
+        'merchant': tx.merchant,
+        'category': tx.category,
+        'source': tx.source,
+        'paymentMethod': tx.paymentMethod,
+      },
       where: 'id = ?',
       whereArgs: [tx.id],
     );

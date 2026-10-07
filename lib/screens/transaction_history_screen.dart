@@ -136,6 +136,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     final merchantController = TextEditingController(text: tx.merchant);
     final sourceController = TextEditingController(text: tx.source);
     String selectedCategory = tx.category;
+    String selectedMethod = tx.paymentMethod;
 
     final availableCategories = TransactionClassifier.categories;
 
@@ -176,7 +177,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     const SizedBox(height: 12),
 
                     const Text(
-                      'Sumber QRIS / Aplikasi',
+                      'Sumber Uang',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -193,6 +194,28 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     ),
                     const SizedBox(height: 12),
 
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedMethod,
+                      decoration: const InputDecoration(
+                        labelText: 'Metode Pembayaran',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: TransactionModel.paymentMethods
+                          .map(
+                            (method) => DropdownMenuItem(
+                              value: method,
+                              child: Text(method),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setStateDialog(() => selectedMethod = value);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     const Text(
                       'Jenis Transaksi',
                       style: TextStyle(
@@ -239,7 +262,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   onPressed: () {
                     setState(() {
                       tx.merchant = merchantController.text;
-                      tx.source = sourceController.text;
+                      tx.source = sourceController.text.trim();
+                      tx.paymentMethod = selectedMethod;
                       tx.category = selectedCategory;
                     });
                     widget.onUpdateTransaction(tx);
@@ -266,120 +290,127 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Detail Transaksi',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      tx.merchant,
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                    subtitle: Text('${tx.category} • Sumber: ${tx.source}'),
-                    trailing: Text(
-                      tx.nominalStr,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
+            return SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Detail Transaksi',
+                      style: TextStyle(
                         fontSize: 18,
-                        color: Colors.teal,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
-                      Icons.calendar_today,
-                      color: Colors.grey,
+                    const Divider(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        tx.merchant,
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                      subtitle: Text(
+                        '${tx.category}\nSumber Uang: ${tx.source}\nMetode: ${tx.paymentMethod}',
+                      ),
+                      trailing: Text(
+                        tx.nominalStr,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.teal,
+                        ),
+                      ),
                     ),
-                    title: const Text('Tanggal & Waktu'),
-                    subtitle: Text(tx.formattedTime),
-                  ),
-                  const SizedBox(height: 16),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: Colors.grey,
+                      ),
+                      title: const Text('Tanggal & Waktu'),
+                      subtitle: Text(tx.formattedTime),
+                    ),
+                    const SizedBox(height: 16),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: const Text('Ubah Tanggal'),
-                          onPressed: () async {
-                            DateTime? pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: tx.dateTime,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (!context.mounted) return;
-                            if (pickedDate != null) {
-                              TimeOfDay? pickedTime = await showTimePicker(
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: const Text('Ubah Tanggal'),
+                            onPressed: () async {
+                              DateTime? pickedDate = await showDatePicker(
                                 context: context,
-                                initialTime: TimeOfDay.fromDateTime(
-                                  tx.dateTime,
-                                ),
+                                initialDate: tx.dateTime,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2100),
                               );
                               if (!context.mounted) return;
-                              if (pickedTime != null) {
-                                widget.onUpdateDate(
-                                  tx,
-                                  DateTime(
-                                    pickedDate.year,
-                                    pickedDate.month,
-                                    pickedDate.day,
-                                    pickedTime.hour,
-                                    pickedTime.minute,
+                              if (pickedDate != null) {
+                                TimeOfDay? pickedTime = await showTimePicker(
+                                  context: context,
+                                  initialTime: TimeOfDay.fromDateTime(
+                                    tx.dateTime,
                                   ),
                                 );
-                                setModalState(() {});
-                                setState(() {});
+                                if (!context.mounted) return;
+                                if (pickedTime != null) {
+                                  widget.onUpdateDate(
+                                    tx,
+                                    DateTime(
+                                      pickedDate.year,
+                                      pickedDate.month,
+                                      pickedDate.day,
+                                      pickedTime.hour,
+                                      pickedTime.minute,
+                                    ),
+                                  );
+                                  setModalState(() {});
+                                  setState(() {});
+                                }
                               }
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text('Edit Detail'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () => _showEditTransactionDialog(
-                            context,
-                            tx,
-                            setModalState,
+                            },
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                      ),
-                      icon: const Icon(Icons.delete),
-                      label: const Text('Hapus Riwayat Ini'),
-                      onPressed: () {
-                        widget.onDelete(tx);
-                        Navigator.pop(context);
-                      },
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.edit, size: 16),
+                            label: const Text('Edit Detail'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => _showEditTransactionDialog(
+                              context,
+                              tx,
+                              setModalState,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                        ),
+                        icon: const Icon(Icons.delete),
+                        label: const Text('Hapus Riwayat Ini'),
+                        onPressed: () {
+                          widget.onDelete(tx);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -621,7 +652,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
-                            '${tx.category} • ${tx.source}\n${tx.formattedTime}',
+                            '${tx.category} • ${tx.paymentMethod}\nSumber Uang: ${tx.source}\n${tx.formattedTime}',
                             style: const TextStyle(fontSize: 12),
                           ),
                           trailing: Text(

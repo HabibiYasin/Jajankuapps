@@ -14,6 +14,7 @@ class ExportService {
     final transactions = workbook['Transaksi'];
     final categories = workbook['Kategori'];
     final months = workbook['Bulanan'];
+    final methods = workbook['Metode Pembayaran'];
 
     void header(Sheet sheet, List<String> labels) {
       sheet.appendRow(labels.map(TextCellValue.new).toList());
@@ -33,10 +34,12 @@ class ExportService {
       'Kategori',
       'Nominal (Rp)',
       'Tanggal & Waktu',
-      'Sumber',
+      'Sumber Uang',
+      'Metode Pembayaran',
     ]);
     header(categories, ['Kategori', 'Jumlah Transaksi', 'Total (Rp)']);
     header(months, ['Bulan', 'Jumlah Transaksi', 'Total (Rp)']);
+    header(methods, ['Metode Pembayaran', 'Jumlah Transaksi', 'Total (Rp)']);
     final categoryTotals = <String, double>{};
     final categoryCounts = <String, int>{};
     final monthTotals = <String, double>{};
@@ -57,6 +60,7 @@ class ExportService {
           second: tx.dateTime.second,
         ),
         TextCellValue(tx.source),
+        TextCellValue(tx.paymentMethod),
       ]);
       transactions
           .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: i + 1))
@@ -97,6 +101,16 @@ class ExportService {
       ]);
     }
     workbook.setDefaultSheet('Transaksi');
+    for (final method in TransactionModel.paymentMethods) {
+      final rows = history.where((tx) => tx.paymentMethod == method).toList();
+      methods.appendRow([
+        TextCellValue(method),
+        IntCellValue(rows.length),
+        DoubleCellValue(
+          rows.fold<double>(0, (total, tx) => total + tx.numericNominal),
+        ),
+      ]);
+    }
     final bytes = workbook.encode();
     if (bytes == null) throw StateError('Gagal membuat laporan Excel.');
     return Uint8List.fromList(bytes);
