@@ -1,6 +1,11 @@
 import '../../models/transaction_model.dart';
 
+/// Parser bukti transaksi BNI / wondr dari teks hasil OCR.
+/// Saat ini digunakan oleh alur OCR pembayaran QRIS.
+/// Parser metode lain (misalnya Transfer) ditambahkan di file ini,
+/// dengan deteksi dan ekstraksi tersendiri sesuai format bukti transaksi.
 class BniParser {
+  // === OCR: deteksi format bukti transaksi saat ini ===
   static bool isMatch(String rawText) {
     final text = rawText.toLowerCase();
     // Acquirer BNI saja tidak berarti struk diterbitkan oleh BNI.
@@ -17,6 +22,7 @@ class BniParser {
             ).hasMatch(rawText));
   }
 
+  /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> lines) {
     final text = rawText.toLowerCase();
     if (RegExp(

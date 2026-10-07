@@ -1,6 +1,11 @@
 import '../../models/transaction_model.dart';
 
+/// Parser bukti transaksi OVO dari teks hasil OCR.
+/// Saat ini digunakan oleh alur OCR pembayaran QRIS.
+/// Parser metode lain (misalnya Transfer) ditambahkan di file ini,
+/// dengan deteksi dan ekstraksi tersendiri sesuai format bukti transaksi.
 class OvoParser {
+  // === OCR: deteksi format bukti transaksi saat ini ===
   static bool isMatch(String rawText) {
     final lower = rawText.toLowerCase();
     return lower.contains('ovo cash terpakai') ||
@@ -9,6 +14,7 @@ class OvoParser {
             lower.contains('total transaksi'));
   }
 
+  /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(
     String rawText,
     List<String> cleanedLines,

@@ -1,6 +1,11 @@
 import '../../models/transaction_model.dart';
 
+/// Parser bukti transaksi BSI / BYOND dari teks hasil OCR.
+/// Saat ini digunakan oleh alur OCR pembayaran QRIS.
+/// Parser metode lain (misalnya Transfer) ditambahkan di file ini,
+/// dengan deteksi dan ekstraksi tersendiri sesuai format bukti transaksi.
 class BsiParser {
+  // === OCR: deteksi format bukti transaksi saat ini ===
   static bool isMatch(String rawText) {
     final lower = rawText.toLowerCase();
     return lower.contains('qris') &&
@@ -14,6 +19,7 @@ class BsiParser {
             ).hasMatch(rawText));
   }
 
+  /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> lines) {
     if (RegExp(
       r'belum\s+berhasil|tidak\s+berhasil|sedang\s+diproses|tertunda|(?:status\s*:\s*|transaksi\s+pembayaran\s+(?:qris\s+mpm\s+kamu\s+)?)(?:gagal|pending|diproses)',

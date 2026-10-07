@@ -36,6 +36,7 @@ class TransactionHistoryScreen extends StatefulWidget {
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _searchQuery = "";
   String _selectedCategory = "Semua";
+  String _selectedPaymentMethod = 'Semua';
   int _selectedMonthOffset = -1;
   String _sortOrder = 'Paling baru';
   bool _exportingPdf = false;
@@ -438,6 +439,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           );
           bool matchesCategory =
               _selectedCategory == "Semua" || tx.category == _selectedCategory;
+          final matchesPaymentMethod =
+              _selectedPaymentMethod == 'Semua' ||
+              tx.paymentMethod == _selectedPaymentMethod;
           final matchesMonth = _selectedMonthOffset == -1
               ? !tx.dateTime.isBefore(firstMonth) &&
                     tx.dateTime.isBefore(nextMonth)
@@ -445,6 +449,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     tx.dateTime.month == selectedMonth.month;
           return matchesSearch &&
               matchesCategory &&
+              matchesPaymentMethod &&
               matchesMonth &&
               tx.isIncome == widget.incomeOnly;
         }).toList()..sort((a, b) {
@@ -452,6 +457,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             'Paling mahal' => b.numericNominal.compareTo(a.numericNominal),
             'Paling murah' => a.numericNominal.compareTo(b.numericNominal),
             'Paling lama' => a.dateTime.compareTo(b.dateTime),
+            'Metode pembayaran (A–Z)' => a.paymentMethod.compareTo(
+              b.paymentMethod,
+            ),
             _ => b.dateTime.compareTo(a.dateTime),
           };
           return comparison != 0
@@ -657,6 +665,49 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   },
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: const ValueKey('history-payment-method-filter'),
+                  initialValue: _selectedPaymentMethod,
+                  isExpanded: true,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Metode Pembayaran',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: ['Semua', ...TransactionModel.paymentMethods]
+                      .map(
+                        (method) => DropdownMenuItem(
+                          value: method,
+                          child: Text(
+                            method,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedPaymentMethod = value);
+                    }
+                  },
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: DropdownButtonFormField<String>(
@@ -682,6 +733,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                             'Paling murah',
                             'Paling baru',
                             'Paling lama',
+                            'Metode pembayaran (A–Z)',
                           ]
                           .map(
                             (order) => DropdownMenuItem(

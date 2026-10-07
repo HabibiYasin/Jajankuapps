@@ -8,7 +8,7 @@ class TransactionModel {
   ];
   final String type;
   bool get isIncome => type == 'income';
-  static const paymentMethods = ['QRIS', 'Transfer', 'VA', 'Cash'];
+  static const paymentMethods = ['QRIS', 'Transfer', 'VA', 'Cash', 'PayLater'];
   String paymentMethod;
   final String? cloudId;
   final String? ownerUid;

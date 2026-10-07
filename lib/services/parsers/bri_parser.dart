@@ -1,6 +1,11 @@
 import '../../models/transaction_model.dart';
 
+/// Parser bukti transaksi BRI / BRImo dari teks hasil OCR.
+/// Saat ini digunakan oleh alur OCR pembayaran QRIS.
+/// Parser metode lain (misalnya Transfer) ditambahkan di file ini,
+/// dengan deteksi dan ekstraksi tersendiri sesuai format bukti transaksi.
 class BriParser {
+  // === OCR: deteksi format bukti transaksi saat ini ===
   static bool isMatch(String rawText) {
     String lower = rawText.toLowerCase();
     return lower.contains("pt. bank rakyat indonesia") || 
@@ -9,6 +14,7 @@ class BriParser {
            (lower.contains("sumber dana") && lower.contains("bri"));
   }
 
+  /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> cleanedLines) {
     String merchantName = "Tidak Diketahui";
     String nominalStr = "Rp0";

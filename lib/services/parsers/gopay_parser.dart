@@ -1,11 +1,17 @@
 import '../../models/transaction_model.dart';
 
+/// Parser bukti transaksi GoPay dari teks hasil OCR.
+/// Saat ini digunakan oleh alur OCR pembayaran QRIS.
+/// Parser metode lain (misalnya Transfer) ditambahkan di file ini,
+/// dengan deteksi dan ekstraksi tersendiri sesuai format bukti transaksi.
 class GopayParser {
+  // === OCR: deteksi format bukti transaksi saat ini ===
   static bool isMatch(String rawText) {
     String lower = rawText.toLowerCase();
     return lower.contains("gopay") && (lower.contains("rincian transaksi") || lower.contains("acquirer name"));
   }
 
+  /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> cleanedLines) {
     String merchantName = "Tidak Diketahui";
     String nominalStr = "Rp0";
