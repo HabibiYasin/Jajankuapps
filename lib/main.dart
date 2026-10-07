@@ -15,6 +15,7 @@ import 'services/auth_service.dart';
 import 'services/budget_notification_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/transaction_history_screen.dart';
+import 'screens/income_screen.dart';
 import 'widgets/expense_floating_menu.dart';
 import 'screens/manual_expense_screen.dart';
 import 'screens/login_screen.dart';
@@ -338,7 +339,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       await _accountData.insert(tx, expectedUid: owner);
       await _loadTransactionsFromDB();
       if (!mounted || owner != _accountData.uid) return;
-      setState(() => _selectedIndex = 0);
+      setState(() => _selectedIndex = isIncome ? 2 : 0);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -509,6 +510,16 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
             onUpdateTransaction: (tx) =>
                 _performEdit(() => _accountData.updateDetails(tx)),
           ),
+          IncomeScreen(
+            key: ValueKey('income-${_accountData.uid}'),
+            history: _transactionHistory,
+            onAddIncome: () => _recordManualExpense(isIncome: true),
+            onDelete: (tx) => _performEdit(() => _accountData.delete(tx)),
+            onUpdateDate: (tx, date) =>
+                _performEdit(() => _accountData.updateDate(tx, date)),
+            onUpdateTransaction: (tx) =>
+                _performEdit(() => _accountData.updateDetails(tx)),
+          ),
           PersonalizationScreen(
             userName: _userName,
             dailyLimit: _dailyBudgetLimit,
@@ -520,7 +531,6 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       floatingActionButton: _selectedIndex == 0
           ? ExpenseFloatingMenu(
               onManualEntry: _recordManualExpense,
-              onIncomeEntry: () => _recordManualExpense(isIncome: true),
               onGallery: () => _processImage(ImageSource.gallery),
               onCamera: () => _processImage(ImageSource.camera),
             )
@@ -558,6 +568,14 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
                 icon: Icon(Icons.receipt_long_outlined),
                 selectedIcon: Icon(Icons.receipt_long, color: AppColors.teal),
                 label: 'Riwayat',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                selectedIcon: Icon(
+                  Icons.account_balance_wallet,
+                  color: AppColors.teal,
+                ),
+                label: 'Pemasukan',
               ),
               NavigationDestination(
                 icon: Icon(Icons.tune_rounded),

@@ -7,6 +7,8 @@ import '../models/budget_limits.dart';
 import '../services/monthly_report_service.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
+  final bool incomeOnly;
+  final Future<void> Function()? onAddIncome;
   final List<TransactionModel> history;
   final BudgetLimits budgetLimits;
   final String userName;
@@ -16,6 +18,8 @@ class TransactionHistoryScreen extends StatefulWidget {
 
   const TransactionHistoryScreen({
     super.key,
+    this.incomeOnly = false,
+    this.onAddIncome,
     required this.history,
     this.budgetLimits = const BudgetLimits(),
     this.userName = 'Pengguna Jajanku',
@@ -34,7 +38,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _selectedCategory = "Semua";
   int _selectedMonthOffset = -1;
   String _sortOrder = 'Paling baru';
-  String _selectedType = 'Semua';
   bool _exportingPdf = false;
 
   Future<void> _downloadMonthlyReport() async {
@@ -220,7 +223,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Jenis Transaksi',
+                      'Kategori',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -440,13 +443,10 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     tx.dateTime.isBefore(nextMonth)
               : tx.dateTime.year == selectedMonth.year &&
                     tx.dateTime.month == selectedMonth.month;
-          final matchesType =
-              _selectedType == 'Semua' ||
-              (_selectedType == 'Pemasukan' ? tx.isIncome : !tx.isIncome);
           return matchesSearch &&
               matchesCategory &&
               matchesMonth &&
-              matchesType;
+              tx.isIncome == widget.incomeOnly;
         }).toList()..sort((a, b) {
           final comparison = switch (_sortOrder) {
             'Paling mahal' => b.numericNominal.compareTo(a.numericNominal),
@@ -464,70 +464,82 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FilledButton.icon(
-            onPressed: _exportingPdf ? null : _downloadMonthlyReport,
-            icon: _exportingPdf
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.picture_as_pdf),
-            label: Text(
-              _exportingPdf
-                  ? 'Membuat laporan PDF...'
-                  : 'Download Laporan Bulanan PDF',
+          if (widget.incomeOnly) ...[
+            FilledButton.icon(
+              onPressed: widget.onAddIncome,
+              icon: const Icon(Icons.add),
+              label: const Text('Catat Pemasukan'),
             ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.download),
-              label: const Text('Ekspor Laporan Excel / Sheets'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+            const SizedBox(height: 16),
+          ] else ...[
+            FilledButton.icon(
+              onPressed: _exportingPdf ? null : _downloadMonthlyReport,
+              icon: _exportingPdf
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf),
+              label: Text(
+                _exportingPdf
+                    ? 'Membuat laporan PDF...'
+                    : 'Download Laporan Bulanan PDF',
               ),
-              onPressed: () async {
-                if (widget.history.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Belum ada transaksi untuk diekspor.'),
-                    ),
-                  );
-                  return;
-                }
-                try {
-                  await ExportService.exportTransactionsToExcel(widget.history);
-                } catch (error) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Gagal mengekspor laporan. Silakan coba lagi.',
-                      ),
-                    ),
-                  );
-                }
-              },
             ),
-          ),
-          const SizedBox(height: 24),
-
-          const Text(
-            'Riwayat Transaksi',
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.download),
+                label: const Text('Ekspor Laporan Excel / Sheets'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () async {
+                  if (widget.history.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Belum ada transaksi untuk diekspor.'),
+                      ),
+                    );
+                    return;
+                  }
+                  try {
+                    await ExportService.exportTransactionsToExcel(
+                      widget.history,
+                    );
+                  } catch (error) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Gagal mengekspor laporan. Silakan coba lagi.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+          Text(
+            widget.incomeOnly ? 'Riwayat Pemasukan' : 'Riwayat Pengeluaran',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 8),
 
           TextField(
             decoration: InputDecoration(
-              hintText: 'Cari nama merchant...',
+              hintText: widget.incomeOnly
+                  ? 'Cari asal pemasukan...'
+                  : 'Cari nama merchant...',
               prefixIcon: const Icon(Icons.search, color: Colors.teal),
               filled: true,
               fillColor: Theme.of(context).colorScheme.surface,
@@ -552,96 +564,147 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           ),
           const SizedBox(height: 12),
 
-          DropdownButtonFormField<String>(
-            initialValue: _selectedType,
-            decoration: const InputDecoration(
-              labelText: 'Jenis Transaksi',
-              border: OutlineInputBorder(),
-            ),
-            items: ['Semua', 'Pengeluaran', 'Pemasukan']
-                .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                .toList(),
-            onChanged: (value) {
-              if (value != null) setState(() => _selectedType = value);
-            },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            key: const ValueKey('history-category-filter'),
-            initialValue: _selectedCategory,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Kategori',
-              prefixIcon: Icon(Icons.category_outlined),
-              border: OutlineInputBorder(),
-            ),
-            items:
-                [
-                      'Semua',
-                      ...TransactionClassifier.categories,
-                      ...TransactionModel.incomeCategories,
-                    ]
-                    .map(
-                      (category) => DropdownMenuItem(
-                        value: category,
-                        child: Text(category),
-                      ),
-                    )
-                    .toList(),
-            onChanged: (value) {
-              if (value != null) setState(() => _selectedCategory = value);
-            },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            key: const ValueKey('history-month-filter'),
-            initialValue: _selectedMonthOffset,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Bulan',
-              prefixIcon: Icon(Icons.calendar_month_outlined),
-              border: OutlineInputBorder(),
-              helperText: 'Bulan ini dan maksimal 3 bulan sebelumnya.',
-            ),
-            items: [
-              const DropdownMenuItem(
-                value: -1,
-                child: Text('Semua bulan tersedia'),
-              ),
-              for (var offset = 0; offset <= 3; offset++)
-                DropdownMenuItem(
-                  value: offset,
-                  child: Text(
-                    MonthlyReportService.monthLabel(
-                      DateTime(now.year, now.month - offset),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: const ValueKey('history-category-filter'),
+                  initialValue: _selectedCategory,
+                  isExpanded: true,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Kategori',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
                     ),
                   ),
+                  items:
+                      [
+                            'Semua',
+                            ...(widget.incomeOnly
+                                ? TransactionModel.incomeCategories
+                                : TransactionClassifier.categories),
+                          ]
+                          .map(
+                            (category) => DropdownMenuItem(
+                              value: category,
+                              child: Text(
+                                category,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedCategory = value);
+                    }
+                  },
                 ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  key: const ValueKey('history-month-filter'),
+                  initialValue: _selectedMonthOffset,
+                  isExpanded: true,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Bulan',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: -1,
+                      child: Text(
+                        'Semua bulan',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    for (var offset = 0; offset <= 3; offset++)
+                      DropdownMenuItem(
+                        value: offset,
+                        child: Text(
+                          MonthlyReportService.monthLabel(
+                            DateTime(now.year, now.month - offset),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedMonthOffset = value);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: const ValueKey('history-sort-order'),
+                  initialValue: _sortOrder,
+                  isExpanded: true,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Urutan',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
+                    ),
+                  ),
+                  items:
+                      [
+                            'Paling mahal',
+                            'Paling murah',
+                            'Paling baru',
+                            'Paling lama',
+                          ]
+                          .map(
+                            (order) => DropdownMenuItem(
+                              value: order,
+                              child: Text(
+                                widget.incomeOnly && order == 'Paling mahal'
+                                    ? 'Paling besar'
+                                    : widget.incomeOnly &&
+                                          order == 'Paling murah'
+                                    ? 'Paling kecil'
+                                    : order,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => _sortOrder = value);
+                  },
+                ),
+              ),
             ],
-            onChanged: (value) {
-              if (value != null) setState(() => _selectedMonthOffset = value);
-            },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            key: const ValueKey('history-sort-order'),
-            initialValue: _sortOrder,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Urutkan berdasarkan',
-              prefixIcon: Icon(Icons.sort),
-              border: OutlineInputBorder(),
-            ),
-            items:
-                ['Paling mahal', 'Paling murah', 'Paling baru', 'Paling lama']
-                    .map(
-                      (order) =>
-                          DropdownMenuItem(value: order, child: Text(order)),
-                    )
-                    .toList(),
-            onChanged: (value) {
-              if (value != null) setState(() => _sortOrder = value);
-            },
           ),
           const SizedBox(height: 12),
 

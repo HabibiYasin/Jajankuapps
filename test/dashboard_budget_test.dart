@@ -33,12 +33,12 @@ void main() {
       );
       await tester.pumpWidget(dashboard(BudgetLimits.snackCategories));
       await tester.pumpAndSettle();
-      expect(find.text('Rp25K'), findsNWidgets(2));
+      expect(find.text('Rp25K'), findsOneWidget);
       expect(find.text('Budget lainnya hari ini: Rp100K'), findsOneWidget);
       expect(find.text('Budget lainnya bulan ini: Rp100K'), findsOneWidget);
       await tester.pumpWidget(dashboard(['Jajan', 'Tagihan & Pulsa']));
       await tester.pumpAndSettle();
-      expect(find.text('Rp125K'), findsNWidgets(2));
+      expect(find.text('Rp125K'), findsOneWidget);
       expect(find.text('Budget lainnya hari ini: Rp0'), findsOneWidget);
       expect(history, hasLength(2));
       expect(tester.takeException(), isNull);

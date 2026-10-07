@@ -89,18 +89,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _getMonthName(int monthNumber) {
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
       'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     return months[monthNumber - 1];
   }
@@ -207,30 +207,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   'Maks. budget: Rp${_formatAmount(budget)}',
                   style: const TextStyle(color: Colors.grey, fontSize: 11),
                 ),
-                if (previousSpent != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    SpendingProgress(
-                      period: label,
-                      date: periodDate,
-                      spent: total,
-                      budget: budget,
-                      monthly: monthly,
-                      previousSpent: previousSpent,
-                    ).comparison!.replaceFirst(
-                      RegExp(
-                        r'\. (Kemarin|Bulan kemarin) belum nyatet kali\.$',
-                      ),
-                      '',
-                    ),
-                    style: const TextStyle(fontSize: 11, color: AppColors.teal),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                const Text(
-                  'Ketuk untuk bagikan',
-                  style: TextStyle(fontSize: 10, color: AppColors.teal),
-                ),
                 const SizedBox(height: 12),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -243,6 +219,146 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _monthlyCashCard(
+    DateTime month,
+    String label,
+    VoidCallback onTap, {
+    bool showDifference = true,
+  }) {
+    final rows = widget.history.where(
+      (t) => t.dateTime.year == month.year && t.dateTime.month == month.month,
+    );
+    final income = rows
+        .where((t) => t.isIncome)
+        .fold<double>(0, (sum, t) => sum + t.numericNominal);
+    final expenses = rows
+        .where((t) => !t.isIncome)
+        .fold<double>(0, (sum, t) => sum + t.numericNominal);
+    final tracked = _calculateTotal(month, monthly: true);
+    final accent = tracked >= widget.monthlyLimit
+        ? AppColors.pink
+        : AppColors.teal;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Pemasukan: ${SpendingProgress.rupiah(income)}',
+                style: const TextStyle(color: Colors.green),
+              ),
+              const SizedBox(height: 6),
+              Text('Pengeluaran: ${SpendingProgress.rupiah(expenses)}'),
+              const SizedBox(height: 6),
+              Text(
+                'Terpakai dari budget: ${SpendingProgress.rupiah(tracked)} / ${SpendingProgress.rupiah(widget.monthlyLimit)}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: widget.monthlyLimit > 0
+                      ? (tracked / widget.monthlyLimit).clamp(0.0, 1.0)
+                      : 0,
+                  minHeight: 6,
+                  color: accent,
+                  backgroundColor: AppColors.mist.withValues(alpha: 0.3),
+                ),
+              ),
+              if (showDifference) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Selisih tercatat: ${SpendingProgress.rupiah(income - expenses)}',
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Selisih bukan saldo rekening. Bar hanya menghitung kategori budget.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ] else ...[
+                const SizedBox(height: 6),
+                const Text(
+                  'Bar hanya menghitung kategori budget.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMonthlyCashFlow() {
+    final now = DateTime.now();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Arus uang bulanan',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              for (final offset in [0, 1])
+                _monthlyCashCard(
+                  DateTime(now.year, now.month - offset),
+                  '${_getMonthName(DateTime(now.year, now.month - offset).month)} ${DateTime(now.year, now.month - offset).year}',
+                  () {
+                    final month = DateTime(now.year, now.month - offset);
+                    Navigator.pop(sheetContext);
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => SpendingProgressScreen(
+                          progress: SpendingProgress(
+                            period: offset == 0 ? 'Bulan Ini' : 'Bulan Kemarin',
+                            date: month,
+                            monthly: true,
+                            spent: _calculateTotal(month, monthly: true),
+                            budget: widget.monthlyLimit,
+                            previousSpent: _calculateTotal(
+                              DateTime(month.year, month.month - 1),
+                              monthly: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
           ),
         ),
       ),
@@ -304,52 +420,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final lastMonth = DateTime(now.year, now.month - 1);
-    final monthTransactions = widget.history.where(
-      (t) => t.dateTime.year == now.year && t.dateTime.month == now.month,
-    );
-    final income = monthTransactions
-        .where((t) => t.isIncome)
-        .fold<double>(0, (sum, t) => sum + t.numericNominal);
-    final expenses = monthTransactions
-        .where((t) => !t.isIncome)
-        .fold<double>(0, (sum, t) => sum + t.numericNominal);
     final currentDaily = _calculateTotal(now);
     final yesterdayTotal = _calculateTotal(yesterday);
-    final currentMonthly = _calculateTotal(now, monthly: true);
-    final lastMonthly = _calculateTotal(lastMonth, monthly: true);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Arus uang bulan ini',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Pemasukan: ${SpendingProgress.rupiah(income)}',
-                    style: const TextStyle(color: Colors.green),
-                  ),
-                  Text('Pengeluaran: ${SpendingProgress.rupiah(expenses)}'),
-                  Text(
-                    'Selisih tercatat: ${SpendingProgress.rupiah(income - expenses)}',
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Selisih bukan saldo rekening. Budget tetap sesuai pengaturan.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
+          _monthlyCashCard(
+            now,
+            'Arus uang ${_getMonthName(now.month)}',
+            _showMonthlyCashFlow,
+            showDifference: false,
           ),
           const SizedBox(height: 12),
           Row(
@@ -381,36 +463,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildSummaryCard(
-                label: 'Bulan Kemarin (${_getMonthName(lastMonth.month)})',
-                periodDate: lastMonth,
-                monthly: true,
-                value: 'Rp${_formatAmount(lastMonthly)}',
-                total: lastMonthly,
-                budget: widget.monthlyLimit,
-                icon: Icons.calendar_month_rounded,
-                accent: lastMonthly >= widget.monthlyLimit
-                    ? AppColors.pink
-                    : AppColors.aqua,
-              ),
-              const SizedBox(width: 12),
-              _buildSummaryCard(
-                label: 'Bulan Ini (${_getMonthName(now.month)})',
-                periodDate: now,
-                monthly: true,
-                value: 'Rp${_formatAmount(currentMonthly)}',
-                total: currentMonthly,
-                previousSpent: lastMonthly,
-                budget: widget.monthlyLimit,
-                icon: Icons.calendar_month_rounded,
-                accent: currentMonthly >= widget.monthlyLimit
-                    ? AppColors.pink
-                    : AppColors.aqua,
-              ),
-            ],
-          ),
           const SizedBox(height: 24),
           const Text(
             'Pengeluaran Budget (7 Hari Terakhir)',
