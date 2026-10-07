@@ -1,4 +1,13 @@
 class TransactionModel {
+  static const incomeCategories = [
+    'Gaji',
+    'Uang Saku',
+    'Bonus',
+    'Usaha',
+    'Lainnya',
+  ];
+  final String type;
+  bool get isIncome => type == 'income';
   static const paymentMethods = ['QRIS', 'Transfer', 'VA', 'Cash'];
   String paymentMethod;
   final String? cloudId;
@@ -15,6 +24,7 @@ class TransactionModel {
     this.cloudId,
     this.ownerUid,
     this.id,
+    this.type = 'expense',
     this.paymentMethod = 'QRIS',
     required this.merchant,
     required this.nominalStr,

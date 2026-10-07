@@ -13,6 +13,7 @@ class CloudAccountStore {
       firestore.doc('users/$uid/settings/budget');
 
   static Map<String, dynamic> encode(TransactionModel tx) => {
+    'type': tx.type,
     'merchant': tx.merchant,
     'nominalStr': tx.nominalStr,
     'dateTime': Timestamp.fromDate(tx.dateTime),
@@ -29,6 +30,7 @@ class CloudAccountStore {
     final map = doc.data();
     return TransactionModel(
       cloudId: doc.id,
+      type: (map['type'] as String?) ?? 'expense',
       ownerUid: uid,
       merchant: map['merchant'] as String,
       nominalStr: map['nominalStr'] as String,

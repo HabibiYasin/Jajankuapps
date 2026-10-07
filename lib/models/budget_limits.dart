@@ -19,7 +19,7 @@ class BudgetLimits {
   List<String> get trackedCategories =>
       categories ?? TransactionClassifier.categories;
   bool includes(TransactionModel transaction) =>
-      trackedCategories.contains(transaction.category);
+      !transaction.isIncome && trackedCategories.contains(transaction.category);
   List<TransactionModel> tracked(List<TransactionModel> history) =>
       history.where(includes).toList();
 

@@ -36,9 +36,17 @@ class ExportService {
       'Tanggal & Waktu',
       'Sumber Uang',
       'Metode Pembayaran',
+      'Jenis Transaksi',
     ]);
     header(categories, ['Kategori', 'Jumlah Transaksi', 'Total (Rp)']);
-    header(months, ['Bulan', 'Jumlah Transaksi', 'Total (Rp)']);
+    header(months, [
+      'Bulan',
+      'Jumlah Pengeluaran',
+      'Pengeluaran (Rp)',
+      'Pemasukan (Rp)',
+      'Selisih Tercatat (Rp)',
+    ]);
+    final incomeTotals = <String, double>{};
     header(methods, ['Metode Pembayaran', 'Jumlah Transaksi', 'Total (Rp)']);
     final categoryTotals = <String, double>{};
     final categoryCounts = <String, int>{};
@@ -61,12 +69,23 @@ class ExportService {
         ),
         TextCellValue(tx.source),
         TextCellValue(tx.paymentMethod),
+        TextCellValue(tx.isIncome ? 'Pemasukan' : 'Pengeluaran'),
       ]);
       transactions
           .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: i + 1))
           .cellStyle = CellStyle(
         numberFormat: CustomDateTimeNumFormat(formatCode: 'dd/mm/yyyy hh:mm'),
       );
+      if (tx.isIncome) {
+        final month =
+            '${tx.dateTime.year}-${tx.dateTime.month.toString().padLeft(2, '0')}';
+        incomeTotals.update(
+          month,
+          (value) => value + tx.numericNominal,
+          ifAbsent: () => tx.numericNominal,
+        );
+        continue;
+      }
       categoryTotals.update(
         tx.category,
         (value) => value + tx.numericNominal,
@@ -93,16 +112,23 @@ class ExportService {
         DoubleCellValue(categoryTotals[category]!),
       ]);
     }
-    for (final month in monthTotals.keys.toList()..sort()) {
+    for (final month in {
+      ...monthTotals.keys,
+      ...incomeTotals.keys,
+    }.toList()..sort()) {
       months.appendRow([
         TextCellValue(month),
-        IntCellValue(monthCounts[month]!),
-        DoubleCellValue(monthTotals[month]!),
+        IntCellValue(monthCounts[month] ?? 0),
+        DoubleCellValue(monthTotals[month] ?? 0),
+        DoubleCellValue(incomeTotals[month] ?? 0),
+        DoubleCellValue((incomeTotals[month] ?? 0) - (monthTotals[month] ?? 0)),
       ]);
     }
     workbook.setDefaultSheet('Transaksi');
     for (final method in TransactionModel.paymentMethods) {
-      final rows = history.where((tx) => tx.paymentMethod == method).toList();
+      final rows = history
+          .where((tx) => !tx.isIncome && tx.paymentMethod == method)
+          .toList();
       methods.appendRow([
         TextCellValue(method),
         IntCellValue(rows.length),

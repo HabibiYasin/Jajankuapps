@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 class ExpenseFloatingMenu extends StatefulWidget {
+  final Future<void> Function()? onIncomeEntry;
   final Future<void> Function() onManualEntry;
   final Future<void> Function() onGallery;
   final Future<void> Function() onCamera;
 
   const ExpenseFloatingMenu({
     super.key,
+    this.onIncomeEntry,
     required this.onManualEntry,
     required this.onGallery,
     required this.onCamera,
@@ -57,9 +59,16 @@ class _ExpenseFloatingMenuState extends State<ExpenseFloatingMenu> {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 170,
-      height: 170,
+      height: widget.onIncomeEntry == null ? 170 : 235,
       child: Stack(
         children: [
+          if (widget.onIncomeEntry != null)
+            _action(
+              'Catat Pemasukan',
+              Icons.add_card_rounded,
+              const Offset(4, 180),
+              widget.onIncomeEntry!,
+            ),
           _action(
             'Catat Manual',
             Icons.edit_note_rounded,

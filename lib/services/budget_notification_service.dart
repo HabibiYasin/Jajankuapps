@@ -31,6 +31,7 @@ class BudgetNotificationService {
   static Map<String, double> dailyTotals(List<TransactionModel> history) {
     final totals = <String, double>{};
     for (final tx in history) {
+      if (tx.isIncome) continue;
       final date = tx.dateTime.toLocal();
       final key =
           '${date.year}-${date.month.toString().padLeft(2, '0')}-'

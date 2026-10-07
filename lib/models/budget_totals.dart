@@ -15,6 +15,7 @@ class BudgetTotals {
     var other = 0.0;
     final target = period.toLocal();
     for (final transaction in history) {
+      if (transaction.isIncome) continue;
       final date = transaction.dateTime.toLocal();
       if (date.year != target.year ||
           date.month != target.month ||

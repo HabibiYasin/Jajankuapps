@@ -17,7 +17,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
-    const int dbVersion = 4;
+    const int dbVersion = 5;
     final path = join(dbPath, filePath);
 
     return await openDatabase(
@@ -33,6 +33,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL DEFAULT 'expense',
         merchant TEXT,
         nominalStr TEXT,
         dateTime TEXT,
@@ -58,6 +59,11 @@ class DatabaseHelper {
       );
     }
     if (oldVersion < 3) await _createMigrationTable(db);
+    if (oldVersion < 5) {
+      await db.execute(
+        "ALTER TABLE transactions ADD COLUMN type TEXT NOT NULL DEFAULT 'expense'",
+      );
+    }
     if (oldVersion < 4) {
       await db.execute(
         "ALTER TABLE transactions ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT 'QRIS'",
@@ -69,6 +75,7 @@ class DatabaseHelper {
   Future<int> insertTransaction(TransactionModel tx) async {
     final db = await instance.database;
     return await db.insert('transactions', {
+      'type': tx.type,
       'merchant': tx.merchant,
       'nominalStr': tx.nominalStr,
       'dateTime': tx.dateTime.toIso8601String(),
@@ -92,6 +99,7 @@ class DatabaseHelper {
         .map(
           (json) => TransactionModel(
             id: json['id'] as int?,
+            type: (json['type'] as String?) ?? 'expense',
             merchant: json['merchant'] as String,
             nominalStr: json['nominalStr'] as String,
             dateTime: DateTime.parse(json['dateTime'] as String),

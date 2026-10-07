@@ -333,6 +333,7 @@ class AccountDataService extends ChangeNotifier {
               expectedUid,
               id,
               TransactionModel(
+                type: (row['type'] as String?) ?? 'expense',
                 merchant: row['merchant'] as String,
                 nominalStr: row['nominalStr'] as String,
                 dateTime: DateTime.parse(row['dateTime'] as String),

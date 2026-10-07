@@ -323,12 +323,14 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     }
   }
 
-  Future<void> _recordManualExpense() async {
+  Future<void> _recordManualExpense({bool isIncome = false}) async {
     if (!await requireLogin(context) || !mounted) return;
     if (!await _awaitBudgetSetup() || !mounted) return;
     final owner = _accountData.uid;
     final tx = await Navigator.of(context).push<TransactionModel>(
-      MaterialPageRoute(builder: (_) => const ManualExpenseScreen()),
+      MaterialPageRoute(
+        builder: (_) => ManualExpenseScreen(isIncome: isIncome),
+      ),
     );
     if (tx == null || !mounted || owner != _accountData.uid) return;
     setState(() => _isLoading = true);
@@ -338,13 +340,19 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       if (!mounted || owner != _accountData.uid) return;
       setState(() => _selectedIndex = 0);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pengeluaran berhasil disimpan.')),
+        SnackBar(
+          content: Text(
+            isIncome
+                ? 'Pemasukan berhasil disimpan.'
+                : 'Pengeluaran berhasil disimpan.',
+          ),
+        ),
       );
-      _checkDailyBudget();
+      if (!isIncome) _checkDailyBudget();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menyimpan pengeluaran: $error')),
+          SnackBar(content: Text('Gagal menyimpan transaksi: $error')),
         );
       }
     } finally {
@@ -512,6 +520,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       floatingActionButton: _selectedIndex == 0
           ? ExpenseFloatingMenu(
               onManualEntry: _recordManualExpense,
+              onIncomeEntry: () => _recordManualExpense(isIncome: true),
               onGallery: () => _processImage(ImageSource.gallery),
               onCamera: () => _processImage(ImageSource.camera),
             )

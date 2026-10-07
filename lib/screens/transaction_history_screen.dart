@@ -34,6 +34,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _selectedCategory = "Semua";
   int _selectedMonthOffset = -1;
   String _sortOrder = 'Paling baru';
+  String _selectedType = 'Semua';
   bool _exportingPdf = false;
 
   Future<void> _downloadMonthlyReport() async {
@@ -138,10 +139,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     String selectedCategory = tx.category;
     String selectedMethod = tx.paymentMethod;
 
-    final availableCategories = TransactionClassifier.categories;
+    final availableCategories = tx.isIncome
+        ? TransactionModel.incomeCategories
+        : TransactionClassifier.categories;
 
     if (!availableCategories.contains(selectedCategory)) {
-      selectedCategory = 'Umum';
+      selectedCategory = availableCategories.last;
     }
 
     showDialog(
@@ -159,8 +162,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Nama Merchant',
+                    Text(
+                      tx.isIncome ? 'Asal Pemasukan' : 'Nama Merchant',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -315,11 +318,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                         '${tx.category}\nSumber Uang: ${tx.source}\nMetode: ${tx.paymentMethod}',
                       ),
                       trailing: Text(
-                        tx.nominalStr,
-                        style: const TextStyle(
+                        '${tx.isIncome ? '+' : '-'} ${tx.nominalStr}',
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
-                          color: Colors.teal,
+                          color: tx.isIncome ? Colors.green : Colors.redAccent,
                         ),
                       ),
                     ),
@@ -437,7 +440,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     tx.dateTime.isBefore(nextMonth)
               : tx.dateTime.year == selectedMonth.year &&
                     tx.dateTime.month == selectedMonth.month;
-          return matchesSearch && matchesCategory && matchesMonth;
+          final matchesType =
+              _selectedType == 'Semua' ||
+              (_selectedType == 'Pemasukan' ? tx.isIncome : !tx.isIncome);
+          return matchesSearch &&
+              matchesCategory &&
+              matchesMonth &&
+              matchesType;
         }).toList()..sort((a, b) {
           final comparison = switch (_sortOrder) {
             'Paling mahal' => b.numericNominal.compareTo(a.numericNominal),
@@ -544,6 +553,20 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           const SizedBox(height: 12),
 
           DropdownButtonFormField<String>(
+            initialValue: _selectedType,
+            decoration: const InputDecoration(
+              labelText: 'Jenis Transaksi',
+              border: OutlineInputBorder(),
+            ),
+            items: ['Semua', 'Pengeluaran', 'Pemasukan']
+                .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedType = value);
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
             key: const ValueKey('history-category-filter'),
             initialValue: _selectedCategory,
             isExpanded: true,
@@ -552,12 +575,19 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               prefixIcon: Icon(Icons.category_outlined),
               border: OutlineInputBorder(),
             ),
-            items: ['Semua', ...TransactionClassifier.categories]
-                .map(
-                  (category) =>
-                      DropdownMenuItem(value: category, child: Text(category)),
-                )
-                .toList(),
+            items:
+                [
+                      'Semua',
+                      ...TransactionClassifier.categories,
+                      ...TransactionModel.incomeCategories,
+                    ]
+                    .map(
+                      (category) => DropdownMenuItem(
+                        value: category,
+                        child: Text(category),
+                      ),
+                    )
+                    .toList(),
             onChanged: (value) {
               if (value != null) setState(() => _selectedCategory = value);
             },
@@ -656,10 +686,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                             style: const TextStyle(fontSize: 12),
                           ),
                           trailing: Text(
-                            tx.nominalStr,
-                            style: const TextStyle(
+                            '${tx.isIncome ? '+' : '-'} ${tx.nominalStr}',
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.redAccent,
+                              color: tx.isIncome
+                                  ? Colors.green
+                                  : Colors.redAccent,
                             ),
                           ),
                         ),

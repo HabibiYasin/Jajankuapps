@@ -22,6 +22,8 @@ class MonthlyReport {
   final DateTime month;
   final DateTime generatedAt;
   final BudgetLimits limits;
+  late final List<TransactionModel> incomes;
+  double get incomeTotal => sum(incomes);
   late final List<TransactionModel> transactions;
   late final List<TransactionModel> previous;
   late final List<TransactionModel> comparablePrevious;
@@ -33,10 +35,14 @@ class MonthlyReport {
     DateTime? generatedAt,
   }) : month = DateTime(month.year, month.month),
        generatedAt = generatedAt ?? DateTime.now() {
-    transactions = history.where((t) => inMonth(t, this.month)).toList()
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    incomes =
+        history.where((t) => t.isIncome && inMonth(t, this.month)).toList()
+          ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    transactions =
+        history.where((t) => !t.isIncome && inMonth(t, this.month)).toList()
+          ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
     final last = DateTime(month.year, month.month - 1);
-    previous = history.where((t) => inMonth(t, last)).toList();
+    previous = history.where((t) => !t.isIncome && inMonth(t, last)).toList();
     final lastDay = DateTime(last.year, last.month + 1, 0).day;
     comparablePrevious = previous
         .where(
@@ -205,6 +211,8 @@ class MonthlyReportService {
       table(
         ['Indikator', 'Nilai'],
         [
+          ['Total pemasukan tercatat', money(r.incomeTotal)],
+          ['Selisih pemasukan dan pengeluaran', money(r.incomeTotal - r.total)],
           ['Total seluruh pengeluaran', money(r.total)],
           ['Budget bulanan', money(r.limits.monthly)],
           ['Pengeluaran yang mengurangi budget', money(r.tracked)],
@@ -429,7 +437,32 @@ class MonthlyReportService {
               ],
           ],
         ),
+      if (r.incomes.isNotEmpty) ...[
+        title('08. Rincian pemasukan'),
+        table(
+          [
+            'Tanggal / jam',
+            'Asal pemasukan',
+            'Kategori',
+            'Masuk ke',
+            'Nominal',
+          ],
+          [
+            for (final t in r.incomes)
+              [
+                t.formattedTime,
+                short(t.merchant),
+                short(t.category),
+                short(t.source),
+                money(t.numericNominal),
+              ],
+          ],
+        ),
+      ],
       title('Catatan laporan'),
+      text(
+        'Selisih hanya dihitung dari pemasukan dan pengeluaran tercatat, bukan saldo rekening. Pemasukan tidak menambah budget bulanan.',
+      ),
       text(
         'Laporan menggunakan transaksi yang tercatat di Jajanku, termasuk pengeluaran di luar kategori budget. Hari tanpa transaksi tidak ditampilkan dalam rekap harian.',
       ),

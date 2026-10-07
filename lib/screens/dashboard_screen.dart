@@ -305,6 +305,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final now = DateTime.now();
     final yesterday = DateTime(now.year, now.month, now.day - 1);
     final lastMonth = DateTime(now.year, now.month - 1);
+    final monthTransactions = widget.history.where(
+      (t) => t.dateTime.year == now.year && t.dateTime.month == now.month,
+    );
+    final income = monthTransactions
+        .where((t) => t.isIncome)
+        .fold<double>(0, (sum, t) => sum + t.numericNominal);
+    final expenses = monthTransactions
+        .where((t) => !t.isIncome)
+        .fold<double>(0, (sum, t) => sum + t.numericNominal);
     final currentDaily = _calculateTotal(now);
     final yesterdayTotal = _calculateTotal(yesterday);
     final currentMonthly = _calculateTotal(now, monthly: true);
@@ -314,6 +323,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Arus uang bulan ini',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pemasukan: ${SpendingProgress.rupiah(income)}',
+                    style: const TextStyle(color: Colors.green),
+                  ),
+                  Text('Pengeluaran: ${SpendingProgress.rupiah(expenses)}'),
+                  Text(
+                    'Selisih tercatat: ${SpendingProgress.rupiah(income - expenses)}',
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Selisih bukan saldo rekening. Budget tetap sesuai pengaturan.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               _buildSummaryCard(

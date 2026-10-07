@@ -13,7 +13,9 @@ class TopCategoriesWidget extends StatelessWidget {
     // 1. Filter transaksi hanya untuk bulan ini
     final now = DateTime.now();
     final currentMonthTransactions = history.where((tx) {
-      return tx.dateTime.year == now.year && tx.dateTime.month == now.month;
+      return !tx.isIncome &&
+          tx.dateTime.year == now.year &&
+          tx.dateTime.month == now.month;
     }).toList();
 
     // 2. Agregasi total nominal per kategori
