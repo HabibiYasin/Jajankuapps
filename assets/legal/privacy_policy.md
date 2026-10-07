@@ -10,7 +10,7 @@ Kebijakan ini menjelaskan bagaimana Jajanku memproses data untuk membantu penggu
 
 ## Data akun
 
-Saat kamu mendaftar atau login, Firebase Authentication memproses email, identitas akun, metode login, dan informasi autentikasi. Jajanku menyimpan email, nama tampilan, metode login, paket akun, waktu pembuatan akun, dan waktu login terakhir. Password dikelola oleh Firebase Authentication dan tidak disimpan sebagai teks di database transaksi Jajanku.
+Saat kamu mendaftar atau login, Firebase Authentication memproses email, identitas akun, metode login, dan informasi autentikasi. Jajanku menyimpan email, nama tampilan, metode login, paket akun, waktu pembuatan akun, dan waktu login terakhir. Aplikasi juga mencatat waktu pertama kali dijalankan yang terdeteksi dan waktu terakhir dibuka, termasuk catatan per instalasi dengan pengenal acak. Waktu pertama terdeteksi tidak selalu sama dengan waktu pemasangan oleh sistem, terutama pada pengguna lama atau setelah pemulihan data perangkat. Aplikasi tidak dapat mencatat waktu uninstall sendiri. Password dikelola oleh Firebase Authentication dan tidak disimpan sebagai teks di database transaksi Jajanku.
 
 ## Catatan pengeluaran dan budget
 

@@ -12,6 +12,10 @@ import 'models/budget_totals.dart';
 import 'services/ocr_service.dart';
 import 'services/account_data_service.dart';
 import 'services/auth_service.dart';
+import 'services/app_activity_service.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'services/budget_notification_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/transaction_history_screen.dart';
@@ -41,6 +45,8 @@ Future<SharedPreferences> _initializeApp() async {
     debugPrint('Firebase gagal diinisialisasi: $error');
   }
 
+  final activityPreferences = await SharedPreferences.getInstance();
+  await AppActivityService.recordLocalOpen(activityPreferences);
   final user = AuthService.instance.currentUser;
   if (user != null) {
     try {
@@ -257,6 +263,24 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadTransactionsFromDB();
+      unawaited(_recordAppOpen());
+    }
+  }
+
+  Future<void> _recordAppOpen() async {
+    try {
+      await AppActivityService.recordLocalOpen(
+        await SharedPreferences.getInstance(),
+      );
+      final user = AuthService.instance.currentUser;
+      if (user != null && !AuthService.needsEmailVerification(user)) {
+        await AppActivityService.recordCloudOpen(
+          FirebaseFirestore.instance,
+          user.uid,
+        );
+      }
+    } catch (error) {
+      debugPrint('Aktivitas aplikasi belum tersinkron: $error');
     }
   }
 

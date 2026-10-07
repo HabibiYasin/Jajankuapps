@@ -8,7 +8,12 @@ Future<void> deleteAccountData(
   required void Function() checkOwner,
 }) async {
   final user = firestore.collection('users').doc(uid);
-  for (final collection in ['transactions', 'settings', 'imports']) {
+  for (final collection in [
+    'transactions',
+    'settings',
+    'imports',
+    'installations',
+  ]) {
     while (true) {
       checkOwner();
       final snapshot = await user

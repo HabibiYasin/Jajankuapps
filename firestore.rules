@@ -20,23 +20,46 @@ service cloud.firestore {
     function positiveAmount(value) {
       return value is number && value > 0 && value <= 1000000000000000;
     }
+    function validActivity() {
+      let d = request.resource.data;
+      return (!('installedAt' in d) || d.installedAt is timestamp)
+        && (!('lastOpenedAt' in d) || d.lastOpenedAt is timestamp)
+        && (!('deletedAt' in d) || d.deletedAt == null);
+    }
     match /users/{uid} {
       allow get, delete: if owns(uid);
       allow create: if owns(uid)
         && request.resource.data.keys().hasAll(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
-        && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt'])
+        && validActivity()
         && request.resource.data.plan == 'free'
         && request.resource.data.email is string
         && request.resource.data.displayName is string
         && request.resource.data.providers is list
+        && (!('lastOpenedAt' in request.resource.data) || request.resource.data.lastOpenedAt == request.time)
         && request.resource.data.createdAt == request.time
         && request.resource.data.lastLoginAt == request.time;
       allow update: if owns(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'displayName', 'providers', 'lastLoginAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'displayName', 'providers', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt'])
+        && validActivity()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastOpenedAt']) || request.resource.data.lastOpenedAt == request.time)
+        && (!('installedAt' in resource.data) || request.resource.data.installedAt == resource.data.installedAt)
         && request.resource.data.email is string
         && request.resource.data.displayName is string
         && request.resource.data.providers is list
-        && request.resource.data.lastLoginAt == request.time;
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastLoginAt']) || request.resource.data.lastLoginAt == request.time);
+    }
+    match /users/{uid}/installations/{id} {
+      allow read, delete: if owns(uid);
+      allow create: if owns(uid)
+        && request.resource.data.keys().hasAll(['installedAt', 'deletedAt', 'lastOpenedAt'])
+        && request.resource.data.keys().hasOnly(['installedAt', 'deletedAt', 'lastOpenedAt'])
+        && request.resource.data.installedAt is timestamp
+        && request.resource.data.deletedAt == null
+        && request.resource.data.lastOpenedAt == request.time;
+      allow update: if owns(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastOpenedAt'])
+        && request.resource.data.lastOpenedAt == request.time;
     }
     match /users/{uid}/transactions/{id} {
       allow read, delete: if owns(uid);

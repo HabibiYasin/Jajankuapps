@@ -14,10 +14,18 @@ void main() {
       }
       await user.collection('settings').doc('budget').set({'daily': 50});
       await user.collection('imports').doc('one').set({'completed': true});
+      await user.collection('installations').doc('device').set({
+        'deletedAt': null,
+      });
       await db.collection('users').doc('bob').set({'displayName': 'Bob'});
       await deleteAccountData(db, 'alice', checkOwner: () {});
       expect((await user.get()).exists, false);
-      for (final collection in ['transactions', 'settings', 'imports']) {
+      for (final collection in [
+        'transactions',
+        'settings',
+        'imports',
+        'installations',
+      ]) {
         expect((await user.collection(collection).get()).docs, isEmpty);
       }
       expect((await db.collection('users').doc('bob').get()).exists, true);

@@ -1,4 +1,5 @@
 import 'account_deletion_service.dart';
+import 'app_activity_service.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -51,6 +52,7 @@ class AuthService {
       final snapshot = await transaction.get(ref);
       savedName = snapshot.data()?['displayName'] as String?;
       transaction.set(ref, {
+        ...await AppActivityService.profileFields(snapshot.data()),
         'email': user.email ?? '',
         'displayName': savedName ?? user.displayName ?? '',
         'providers': user.providerData.map((p) => p.providerId).toList(),
@@ -59,6 +61,10 @@ class AuthService {
         if (!snapshot.exists) 'plan': 'free',
       }, SetOptions(merge: true));
     });
+    await AppActivityService.recordInstallation(
+      FirebaseFirestore.instance,
+      user.uid,
+    );
     if (savedName != null &&
         user.displayName != savedName &&
         currentUser?.uid == user.uid) {

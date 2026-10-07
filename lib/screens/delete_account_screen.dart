@@ -67,7 +67,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           const Text(
-            'Akun, profil, transaksi, pengaturan budget, dan riwayat import di cloud akan dihapus permanen. Data Guest di HP ini tetap ada. Penghapusan memerlukan internet.',
+            'Akun, profil, transaksi, pengaturan budget, riwayat import, dan catatan instalasi di cloud akan dihapus permanen. Data Guest di HP ini tetap ada. Penghapusan memerlukan internet.',
           ),
           const SizedBox(height: 20),
           if (_google)

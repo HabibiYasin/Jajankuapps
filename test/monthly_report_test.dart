@@ -48,6 +48,12 @@ void main() {
       expect(r.changePercent, 70);
       expect(r.groups(merchants: true).first.count, 2);
       expect(r.groups().first.name, 'Makanan');
+      final allCategories = r.groups(includeEmpty: true);
+      expect(allCategories, hasLength(8));
+      expect(allCategories.first.name, 'Makanan');
+      final unused = allCategories.singleWhere((g) => g.name == 'Minuman');
+      expect(unused.count, 0);
+      expect(unused.total, 0);
       expect(MonthlyReport.sum(r.previous), 200);
     },
   );
@@ -87,7 +93,7 @@ void main() {
       final raw = latin1.decode(bytes);
       final pages = RegExp(r'/Type\s*/Page\b').allMatches(raw).length;
       expect(pages, greaterThanOrEqualTo(3));
-      if (count <= 10) expect(pages, 3);
+      if (count <= 10) expect(pages, lessThanOrEqualTo(4));
       if (count == 400) expect(pages, greaterThan(3));
     }
   });

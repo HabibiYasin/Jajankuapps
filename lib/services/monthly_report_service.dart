@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/budget_limits.dart';
 import '../models/transaction_model.dart';
+import 'transaction_classifier.dart';
 
 class ReportGroup {
   final String name;
@@ -66,8 +67,15 @@ class MonthlyReport {
       previousTotal > 0 ? (total - previousTotal) / previousTotal * 100 : null;
   double get usedPercent => tracked / limits.monthly * 100;
 
-  List<ReportGroup> groups({bool merchants = false}) {
-    final groups = <String, ReportGroup>{};
+  List<ReportGroup> groups({
+    bool merchants = false,
+    bool includeEmpty = false,
+  }) {
+    final groups = <String, ReportGroup>{
+      if (includeEmpty && !merchants)
+        for (final category in TransactionClassifier.categories)
+          category.toLowerCase(): ReportGroup(category),
+    };
     for (final t in transactions) {
       final name = (merchants ? t.merchant : t.category).trim();
       final key = name.toLowerCase();
@@ -316,46 +324,98 @@ class MonthlyReportService {
       ),
     ]);
 
-    final categories = r.groups();
-    final frequentCategories = List<ReportGroup>.of(categories)
-      ..sort((a, b) {
-        final result = b.count.compareTo(a.count);
-        return result != 0 ? result : b.total.compareTo(a.total);
-      });
+    final categories = r.groups(includeEmpty: true);
+    final chartCategories = categories.where((g) => g.total > 0).toList();
+    final chartColors = [
+      '#00796B',
+      '#EF6C00',
+      '#1565C0',
+      '#8E24AA',
+      '#C62828',
+      '#00838F',
+      '#5D4037',
+      '#546E7A',
+    ].map(PdfColor.fromHex).toList();
     final merchants = r.groups(merchants: true);
     final days = <int, List<TransactionModel>>{};
     for (final t in r.transactions) {
       days.putIfAbsent(t.dateTime.day, () => []).add(t);
     }
     page([
-      title('03. Tiga kategori dengan pengeluaran terbesar'),
+      title('03. Pengeluaran seluruh kategori'),
       text(
-        'Diurutkan berdasarkan nominal; jumlah transaksi menunjukkan frekuensi pembelian.',
+        'Diurutkan dari pengeluaran terbesar. Semua kategori ditampilkan, termasuk yang belum memiliki pengeluaran.',
       ),
       pw.SizedBox(height: 8),
-      if (categories.isEmpty)
-        text('Belum ada transaksi pada bulan ini.')
+      table(
+        ['Kategori', 'Transaksi', 'Total', '% pengeluaran'],
+        categories
+            .map(
+              (g) => [
+                short(g.name),
+                '${g.count}',
+                money(g.total),
+                '${(r.total == 0 ? 0 : g.total / r.total * 100).toStringAsFixed(1)}%',
+              ],
+            )
+            .toList(),
+      ),
+      pw.SizedBox(height: 12),
+      if (chartCategories.isEmpty)
+        text('Grafik belum tersedia karena total pengeluaran bulan ini Rp0.')
       else
-        table(
-          ['Kategori', 'Transaksi', 'Total', '% pengeluaran'],
-          categories
-              .take(3)
-              .map(
-                (g) => [
-                  short(g.name),
-                  '${g.count}',
-                  money(g.total),
-                  '${(r.total == 0 ? 0 : g.total / r.total * 100).toStringAsFixed(1)}%',
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.SizedBox(
+              width: 165,
+              height: 150,
+              child: pw.Chart(
+                grid: pw.PieGrid(),
+                datasets: [
+                  for (var i = 0; i < chartCategories.length; i++)
+                    pw.PieDataSet(
+                      value: chartCategories[i].total,
+                      color: chartColors[i % chartColors.length],
+                      legendPosition: pw.PieLegendPosition.none,
+                    ),
                 ],
-              )
-              .toList(),
+              ),
+            ),
+            pw.SizedBox(width: 14),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < chartCategories.length; i++)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 3),
+                      child: pw.Row(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Container(
+                            width: 9,
+                            height: 9,
+                            color: chartColors[i % chartColors.length],
+                          ),
+                          pw.SizedBox(width: 6),
+                          pw.Expanded(
+                            child: text(
+                              '${short(chartCategories[i].name)}: ${(chartCategories[i].total / r.total * 100).toStringAsFixed(1)}%',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-      if (frequentCategories.isNotEmpty) ...[
-        pw.SizedBox(height: 8),
-        text(
-          'Kategori paling sering dibeli: ${frequentCategories.take(3).map((g) => '${short(g.name)} (${g.count} transaksi)').join('; ')}.',
-        ),
-      ],
+      pw.SizedBox(height: 6),
+      text(
+        'Persentase dihitung dari seluruh pengeluaran, termasuk kategori di luar budget. Kategori Rp0 tidak memiliki irisan pada grafik.',
+      ),
       title('04. Toko dengan pembelian terbanyak'),
       text(
         'Diurutkan berdasarkan jumlah transaksi; jika sama, berdasarkan total nominal. Nama toko dikelompokkan tanpa membedakan huruf besar/kecil.',
