@@ -9,7 +9,7 @@ service cloud.firestore {
       return d.keys().hasAll(['merchant', 'nominalStr', 'dateTime', 'category', 'source', 'numericNominal'])
         && d.keys().hasOnly(['merchant', 'nominalStr', 'dateTime', 'category', 'source', 'numericNominal', 'paymentMethod', 'type'])
         && (!('type' in d) || d.type in ['expense', 'income'])
-        && (!('paymentMethod' in d) || d.paymentMethod in ['QRIS', 'Transfer', 'VA', 'Cash'])
+        && (!('paymentMethod' in d) || d.paymentMethod in ['QRIS', 'Transfer', 'VA', 'Cash', 'PayLater'])
         && d.merchant is string && d.merchant.size() <= 2000
         && d.nominalStr is string && d.nominalStr.size() <= 200
         && d.dateTime is timestamp

@@ -396,6 +396,15 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     }
   }
 
+  Future<void> Function(List<TransactionModel>, String) _sheetImporter(
+    String? uid,
+  ) =>
+      (transactions, revision) => _accountData.replaceTransactions(
+        transactions,
+        expectedUid: uid,
+        expectedRevision: revision,
+      );
+
   void _checkDailyBudget() {
     final totalToday = BudgetTotals.forPeriod(
       _transactionHistory,
@@ -525,6 +534,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
           TransactionHistoryScreen(
             key: ValueKey('history-${_accountData.uid}'),
             history: _transactionHistory,
+            importRevision: _accountData.transactionRevision,
+            onImportTransactions: _sheetImporter(_accountData.uid),
             budgetLimits: _accountData.limits,
             userName:
                 AuthService.instance.currentUser?.displayName ?? _userName,

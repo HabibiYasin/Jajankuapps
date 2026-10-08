@@ -37,6 +37,7 @@ void main() {
         'Kategori',
         'Bulanan',
         'Metode Pembayaran',
+        'Petunjuk',
       ]);
       final rows = workbook['Transaksi'].rows;
       expect(rows.length, 4);

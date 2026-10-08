@@ -1,11 +1,15 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
+import 'package:archive/archive.dart';
+import 'package:xml/xml.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/transaction_model.dart';
+import 'transaction_sheet_service.dart';
 
 class ExportService {
   static Uint8List buildWorkbook(List<TransactionModel> history) {
@@ -28,16 +32,7 @@ class ExportService {
       }
     }
 
-    header(transactions, [
-      'No',
-      'Merchant',
-      'Kategori',
-      'Nominal (Rp)',
-      'Tanggal & Waktu',
-      'Sumber Uang',
-      'Metode Pembayaran',
-      'Jenis Transaksi',
-    ]);
+    header(transactions, TransactionSheetService.headers);
     header(categories, ['Kategori', 'Jumlah Transaksi', 'Total (Rp)']);
     header(months, [
       'Bulan',
@@ -137,15 +132,90 @@ class ExportService {
         ),
       ]);
     }
+    final instructions = workbook['Petunjuk'];
+    header(instructions, ['Panduan ekspor/impor']);
+    instructions.setColumnWidth(0, 110);
+    for (final line in [
+      'Edit sheet Transaksi. Impor mengganti SELURUH pemasukan dan pengeluaran dengan isi sheet ini.',
+      'Tambahkan baris untuk transaksi baru. Baris yang dihapus tidak akan ada lagi setelah impor.',
+      'Semua 8 kolom wajib diisi. No harus angka bulat positif dan unik (bukan ID transaksi).',
+      'Tanggal: dd/mm/yyyy atau dd/mm/yyyy HH:mm (24 jam). Tanpa waktu otomatis 00:00.',
+      'Nominal: angka lebih dari 0, tanpa Rp/pemisah ribuan. Gunakan sel angka untuk nominal desimal.',
+      'Pilih Kategori, Metode Pembayaran, dan Jenis Transaksi melalui dropdown.',
+      'Kategori pengeluaran: ${TransactionSheetService.categories.where((c) => !TransactionModel.incomeCategories.contains(c)).join(', ')}.',
+      'Kategori pemasukan: ${TransactionModel.incomeCategories.join(', ')}.',
+      'Jangan gunakan rumus. Baris yang seluruhnya kosong diabaikan.',
+      'Google Sheets: setelah mengedit, pilih File > Download > Microsoft Excel (.xlsx), lalu impor file tersebut.',
+      'Sheet ringkasan tidak diimpor; ekspor ulang setelah impor untuk memperbarui ringkasan.',
+    ]) {
+      instructions.appendRow([TextCellValue(line)]);
+    }
     final bytes = workbook.encode();
     if (bytes == null) throw StateError('Gagal membuat laporan Excel.');
-    return Uint8List.fromList(bytes);
+    return _addDropdowns(bytes);
+  }
+
+  // excel 4.x does not expose data validation. Add standard OOXML list
+  // validations after encoding, including unused rows for new transactions.
+  static Uint8List _addDropdowns(List<int> bytes) {
+    final archive = ZipDecoder().decodeBytes(bytes);
+    XmlDocument document(String path) => XmlDocument.parse(
+      utf8.decode(archive.findFile(path)!.content as List<int>),
+    );
+    final workbook = document('xl/workbook.xml');
+    final sheet = workbook
+        .findAllElements('sheet')
+        .firstWhere((element) => element.getAttribute('name') == 'Transaksi');
+    final relation = document('xl/_rels/workbook.xml.rels')
+        .findAllElements('Relationship')
+        .firstWhere(
+          (element) => element.getAttribute('Id') == sheet.getAttribute('r:id'),
+        );
+    final target = relation.getAttribute('Target')!;
+    final path = target.startsWith('/') ? target.substring(1) : 'xl/$target';
+    final worksheet = document(path);
+    final builder = XmlBuilder();
+    builder.element(
+      'dataValidations',
+      attributes: {'count': '3'},
+      nest: () {
+        for (final entry in {
+          'C': TransactionSheetService.categories,
+          'G': TransactionModel.paymentMethods,
+          'H': TransactionSheetService.types,
+        }.entries) {
+          builder.element(
+            'dataValidation',
+            attributes: {
+              'type': 'list',
+              'allowBlank': '0',
+              'showDropDown': '0',
+              'showErrorMessage': '1',
+              'errorStyle': 'stop',
+              'errorTitle': 'Pilihan tidak valid',
+              'error': 'Pilih nilai dari dropdown.',
+              'sqref': '${entry.key}2:${entry.key}1048576',
+            },
+            nest: () {
+              builder.element('formula1', nest: '"${entry.value.join(',')}"');
+            },
+          );
+        }
+      },
+    );
+    final data = worksheet.rootElement.findElements('sheetData').single;
+    worksheet.rootElement.children.insert(
+      worksheet.rootElement.children.indexOf(data) + 1,
+      builder.buildDocument().rootElement.copy(),
+    );
+    final content = utf8.encode(worksheet.toXmlString());
+    archive.addFile(ArchiveFile(path, content.length, content));
+    return Uint8List.fromList(ZipEncoder().encode(archive)!);
   }
 
   static Future<void> exportTransactionsToExcel(
     List<TransactionModel> history,
   ) async {
-    if (history.isEmpty) return;
     final bytes = buildWorkbook(history);
     final directory = await getTemporaryDirectory();
     final path =
@@ -157,6 +227,6 @@ class ExportService {
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       ),
-    ], text: 'Laporan pengeluaran Jajanku');
+    ], text: 'Data transaksi Jajanku');
   }
 }

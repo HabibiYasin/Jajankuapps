@@ -179,6 +179,107 @@ class AccountDataService extends ChangeNotifier {
     }
   }
 
+  void _checkTransactionWrite() {
+    if (importing) throw StateError('Tunggu proses impor selesai.');
+  }
+
+  /// Replaces the complete ledger in one atomic write. Never split the import
+  /// into batches: a rejected write must leave the previous ledger intact.
+  Future<void> replaceTransactions(
+    List<TransactionModel> transactions, {
+    required String? expectedUid,
+    required String expectedRevision,
+  }) async {
+    _checkOwner(expectedUid);
+    _checkTransactionWrite();
+    if (!ready || pending) {
+      throw StateError(
+        'Tunggu data selesai dimuat dan disimpan sebelum impor.',
+      );
+    }
+    if (transactions.isEmpty) {
+      throw StateError('Tidak ada transaksi untuk diimpor.');
+    }
+    if (transactionRevision != expectedRevision) {
+      throw StateError(
+        'Riwayat berubah. Pilih ulang file dan periksa kembali sebelum impor.',
+      );
+    }
+    final generation = _generation;
+    importing = true;
+    _emit();
+    void check() {
+      _checkOwner(expectedUid);
+      if (!_active(generation)) throw StateError('Akun berubah saat impor.');
+    }
+
+    try {
+      if (expectedUid == null) {
+        await DatabaseHelper.instance.replaceTransactions(
+          transactions,
+          checkOwner: check,
+        );
+        await refreshGuest();
+      } else {
+        final cloud = _cloud;
+        final collection = cloud.transactions(expectedUid);
+        final existing = await collection.get(
+          const GetOptions(source: Source.server),
+        );
+        check();
+        if (_revision(
+              existing.docs
+                  .map((d) => CloudAccountStore.decode(expectedUid, d))
+                  .toList(),
+            ) !=
+            expectedRevision) {
+          throw StateError(
+            'Riwayat berubah di cloud. Pilih ulang file sebelum impor.',
+          );
+        }
+        // Reuse document slots so the write count is max(old, new), not their sum.
+        final batch = cloud.firestore.batch();
+        for (var i = 0; i < transactions.length; i++) {
+          final ref = i < existing.docs.length
+              ? existing.docs[i].reference
+              : collection.doc();
+          batch.set(ref, CloudAccountStore.encode(transactions[i]));
+        }
+        for (var i = transactions.length; i < existing.docs.length; i++) {
+          batch.delete(existing.docs[i].reference);
+        }
+        check();
+        await batch.commit();
+      }
+    } finally {
+      importing = false;
+      _emit();
+    }
+  }
+
+  String get transactionRevision => _revision(history);
+
+  static String _revision(List<TransactionModel> rows) {
+    final entries =
+        rows
+            .map(
+              (tx) => jsonEncode({
+                'id': tx.cloudId ?? tx.id,
+                'type': tx.type,
+                'merchant': tx.merchant,
+                'amount': tx.numericNominal,
+                'nominal': tx.nominalStr,
+                'date': tx.dateTime.toIso8601String(),
+                'category': tx.category,
+                'source': tx.source,
+                'method': tx.paymentMethod,
+              }),
+            )
+            .toList()
+          ..sort();
+    return jsonEncode(entries);
+  }
+
   void _queue(Future<void> operation) {
     final generation = _generation;
     _writes++;
@@ -207,6 +308,7 @@ class AccountDataService extends ChangeNotifier {
     required String? expectedUid,
   }) async {
     _checkOwner(expectedUid);
+    _checkTransactionWrite();
     if (expectedUid == null) {
       await DatabaseHelper.instance.insertTransaction(tx);
       await refreshGuest();
@@ -222,6 +324,7 @@ class AccountDataService extends ChangeNotifier {
 
   Future<void> delete(TransactionModel tx) async {
     _checkOwner(tx.ownerUid);
+    _checkTransactionWrite();
     if (tx.ownerUid == null) {
       await DatabaseHelper.instance.deleteTransaction(tx);
       await refreshGuest();
@@ -232,6 +335,7 @@ class AccountDataService extends ChangeNotifier {
 
   Future<void> updateDate(TransactionModel tx, DateTime date) async {
     _checkOwner(tx.ownerUid);
+    _checkTransactionWrite();
     if (tx.ownerUid == null) {
       await DatabaseHelper.instance.updateTransactionDate(tx, date);
       await refreshGuest();
@@ -246,6 +350,7 @@ class AccountDataService extends ChangeNotifier {
 
   Future<void> updateDetails(TransactionModel tx) async {
     _checkOwner(tx.ownerUid);
+    _checkTransactionWrite();
     if (tx.ownerUid == null) {
       await DatabaseHelper.instance.updateTransactionFull(tx);
       await refreshGuest();

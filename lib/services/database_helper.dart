@@ -87,6 +87,34 @@ class DatabaseHelper {
   }
 
   // READ: Ambil Semua Riwayat Transaksi
+  Future<void> replaceTransactions(
+    List<TransactionModel> transactions, {
+    required void Function() checkOwner,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      checkOwner();
+      // Rows reserved for a cloud migration belong to that account.
+      await txn.delete(
+        'transactions',
+        where: 'id NOT IN (SELECT localId FROM cloud_imports)',
+      );
+      for (final tx in transactions) {
+        await txn.insert('transactions', {
+          'type': tx.type,
+          'merchant': tx.merchant,
+          'nominalStr': tx.nominalStr,
+          'dateTime': tx.dateTime.toIso8601String(),
+          'category': tx.category,
+          'source': tx.source,
+          'paymentMethod': tx.paymentMethod,
+          'numericNominal': tx.numericNominal,
+        });
+      }
+      checkOwner();
+    });
+  }
+
   Future<List<TransactionModel>> fetchTransactions() async {
     final db = await instance.database;
     final result = await db.query(

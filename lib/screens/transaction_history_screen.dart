@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../models/transaction_model.dart';
 import '../services/transaction_classifier.dart';
 import '../services/export_service.dart';
 import '../models/budget_limits.dart';
 import '../services/monthly_report_service.dart';
+import '../services/transaction_sheet_service.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   final bool incomeOnly;
@@ -15,6 +18,9 @@ class TransactionHistoryScreen extends StatefulWidget {
   final Function(TransactionModel) onDelete;
   final Function(TransactionModel, DateTime) onUpdateDate;
   final Function(TransactionModel) onUpdateTransaction;
+  final Future<void> Function(List<TransactionModel>, String)?
+  onImportTransactions;
+  final String importRevision;
 
   const TransactionHistoryScreen({
     super.key,
@@ -26,6 +32,8 @@ class TransactionHistoryScreen extends StatefulWidget {
     required this.onDelete,
     required this.onUpdateDate,
     required this.onUpdateTransaction,
+    this.onImportTransactions,
+    this.importRevision = '',
   });
 
   @override
@@ -40,6 +48,141 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   int _selectedMonthOffset = -1;
   String _sortOrder = 'Paling baru';
   bool _exportingPdf = false;
+  bool _sheetBusy = false;
+
+  Future<void> _showSheetActions() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Ekspor/Impor Data Excel/Sheet',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Edit sheet Transaksi untuk mengubah atau menambah transaksi. '
+                'Impor mengganti seluruh pemasukan dan pengeluaran. '
+                'Semua kolom wajib diisi; tanggal tanpa waktu menjadi 00:00. '
+                'Dari Google Sheets, unduh sebagai Microsoft Excel (.xlsx).',
+              ),
+              ListTile(
+                leading: const Icon(Icons.download),
+                title: Text(
+                  widget.history.isEmpty
+                      ? 'Ekspor template kosong'
+                      : 'Ekspor seluruh transaksi',
+                ),
+                onTap: () => Navigator.pop(context, 'export'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.upload_file),
+                title: const Text('Impor Excel/Sheet (.xlsx)'),
+                enabled: widget.onImportTransactions != null,
+                onTap: () => Navigator.pop(context, 'import'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    final revision = widget.importRevision;
+    setState(() => _sheetBusy = true);
+    try {
+      if (action == 'export') {
+        await ExportService.exportTransactionsToExcel(widget.history);
+      } else {
+        final picked = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['xlsx'],
+          withData: true,
+        );
+        if (picked == null || !mounted) return;
+        final bytes = picked.files.single.bytes;
+        if (bytes == null) {
+          throw StateError('File tidak dapat dibaca. Pilih ulang file.');
+        }
+        final imported = await compute(TransactionSheetService.parse, bytes);
+        if (!mounted) return;
+        final incomes = imported.where((tx) => tx.isIncome).length;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Verifikasi impor'),
+            content: SingleChildScrollView(
+              child: Text(
+                '${picked.files.single.name}\n\n'
+                '${imported.length} transaksi valid: $incomes pemasukan dan '
+                '${imported.length - incomes} pengeluaran.\n\n'
+                'Seluruh ${widget.history.length} transaksi saat ini akan diganti '
+                'dengan isi file. Transaksi yang tidak ada di file akan dihapus. '
+                'Pastikan salinan ekspor sudah disimpan sebelum melanjutkan.',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Ganti seluruh transaksi'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+        await widget.onImportTransactions!(imported, revision);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${imported.length} transaksi berhasil diimpor.'),
+          ),
+        );
+      }
+    } on SheetValidationException catch (error) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Perbaiki isi sheet'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Text(
+                'Data belum diubah. Ditemukan ${error.errors.length} kesalahan:\n\n${error.errors.join('\n\n')}',
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tutup'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Gagal ${action == 'export' ? 'mengekspor' : 'mengimpor'} data. Periksa file dan koneksi, lalu coba lagi.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sheetBusy = false);
+    }
+  }
 
   Future<void> _downloadMonthlyReport() async {
     final now = DateTime.now();
@@ -499,8 +642,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.download),
-                label: const Text('Ekspor Laporan Excel / Sheets'),
+                icon: _sheetBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.import_export),
+                label: Text(
+                  _sheetBusy
+                      ? 'Memproses data...'
+                      : 'Ekspor/Impor Data Excel/Sheet',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.teal,
                   foregroundColor: Colors.white,
@@ -509,30 +662,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: () async {
-                  if (widget.history.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Belum ada transaksi untuk diekspor.'),
-                      ),
-                    );
-                    return;
-                  }
-                  try {
-                    await ExportService.exportTransactionsToExcel(
-                      widget.history,
-                    );
-                  } catch (error) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Gagal mengekspor laporan. Silakan coba lagi.',
-                        ),
-                      ),
-                    );
-                  }
-                },
+                onPressed: _sheetBusy ? null : _showSheetActions,
               ),
             ),
             const SizedBox(height: 24),

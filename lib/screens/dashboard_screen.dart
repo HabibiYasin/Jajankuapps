@@ -185,9 +185,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Icon(icon, size: 20, color: accent),
                 ),
                 const SizedBox(height: 14),
-                Text(
-                  label,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 3),
                 FittedBox(

@@ -69,6 +69,8 @@ async function query(uid, owner, expected) {
   await request('GET',tx,null,undefined,403);
   await request('PATCH',tx,null,transaction,403);
   await request('PATCH',tx,'alice',transaction);
+  await request('PATCH',tx,'alice',{...transaction,paymentMethod:{stringValue:'PayLater'}});
+  await request('PATCH',tx,'alice',{...transaction,paymentMethod:{stringValue:'Unknown'}},403);
   await request('GET',tx,'alice');
   await query('alice','alice',200);
   await query('bob','alice',403);
