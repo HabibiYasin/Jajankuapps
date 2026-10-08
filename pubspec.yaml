@@ -38,6 +38,7 @@ dev_dependencies:
   fake_cloud_firestore: ^4.3.0
 
 flutter:
+  default-flavor: dev
   uses-material-design: true
   assets:
     - assets/icon/

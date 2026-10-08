@@ -30,7 +30,7 @@ import 'screens/splash_screen.dart';
 import 'screens/budget_settings_screen.dart';
 import 'theme/app_theme.dart';
 
-import 'firebase_options.dart';
+import 'config/app_environment.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,10 +38,9 @@ void main() {
 }
 
 Future<SharedPreferences> _initializeApp() async {
+  final environment = AppEnvironment.current;
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp(options: environment.firebaseOptions);
   } catch (error) {
     debugPrint('Firebase gagal diinisialisasi: $error');
   }
