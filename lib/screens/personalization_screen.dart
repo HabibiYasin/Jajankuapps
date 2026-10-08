@@ -10,7 +10,7 @@ import '../services/profile_avatar_store.dart';
 import '../services/account_data_service.dart';
 import '../services/budget_notification_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/tutorial_dialog.dart';
+import 'usage_guide_screen.dart';
 import 'budget_settings_screen.dart';
 import 'login_screen.dart';
 import 'change_password_screen.dart';
@@ -629,8 +629,13 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           _menuTile(
             icon: Icons.help_outline,
             title: 'Cara Pakai',
-            subtitle: 'Lihat panduan penggunaan aplikasi',
-            onTap: () => showTutorialDialog(context),
+            subtitle: 'Panduan mencatat, budget, laporan, dan FAQ',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const UsageGuideScreen(),
+              ),
+            ),
           ),
           if (BudgetNotificationService.isSupported)
             _menuTile(

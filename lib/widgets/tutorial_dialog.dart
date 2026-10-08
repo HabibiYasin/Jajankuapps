@@ -25,7 +25,7 @@ Future<void> showTutorialDialog(
                   children: [
                     const Expanded(
                       child: Text(
-                        'Cara Pakai QRIS Tracker',
+                        'Cara Catat',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
