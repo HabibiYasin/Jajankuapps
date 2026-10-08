@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +13,7 @@ import '../models/spending_progress.dart';
 import 'spending_progress_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
+  final bool isPremium;
   final List<TransactionModel> history;
   final double dailyLimit;
   final double monthlyLimit;
@@ -18,6 +21,7 @@ class DashboardScreen extends StatefulWidget {
 
   const DashboardScreen({
     super.key,
+    this.isPremium = false,
     required this.history,
     required this.dailyLimit,
     required this.monthlyLimit,
@@ -483,18 +487,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 12),
-          Container(
-            height: 190,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: _buildChartBars(),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                ExcludeSemantics(
+                  excluding: !widget.isPremium,
+                  child: IgnorePointer(
+                    ignoring: !widget.isPremium,
+                    child: ImageFiltered(
+                      enabled: !widget.isPremium,
+                      imageFilter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                      child: Container(
+                        height: 190,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: _buildChartBars(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!widget.isPremium)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: Theme.of(context).colorScheme.surface
+                          .withValues(alpha: 0.45),
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock_outline_rounded, size: 28),
+                            SizedBox(height: 8),
+                            Text(
+                              'only for premium',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

@@ -21,7 +21,7 @@ import 'notification_settings_screen.dart';
 enum UserTier {
   guest('Jajaners CobaCoba'),
   free('Jajaners Gratisan'),
-  premium('Jajaners VIP');
+  premium('Jajaners Sultan');
 
   const UserTier(this.label);
 

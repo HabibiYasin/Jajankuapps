@@ -11,11 +11,11 @@ class SplashScreen extends StatelessWidget {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: Color(0xFFFF861C),
+        systemNavigationBarColor: Color(0xFF00BFB3),
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFFFF861C),
+        backgroundColor: const Color(0xFF00BFB3),
         body: SizedBox.expand(
           child: Image.asset(
             'assets/splash/jajanku_splash.png',

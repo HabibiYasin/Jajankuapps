@@ -11,6 +11,7 @@ import 'models/transaction_model.dart';
 import 'models/budget_totals.dart';
 import 'services/ocr_service.dart';
 import 'services/account_data_service.dart';
+import 'services/profile_plan_store.dart';
 import 'services/auth_service.dart';
 import 'services/app_activity_service.dart';
 
@@ -139,6 +140,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   final String _userName = "Guest";
   final _accountData = AccountDataService.instance;
   String? _visibleUid;
+  bool _isPremium = false;
+  StreamSubscription<bool>? _planSubscription;
   double get _dailyBudgetLimit => _accountData.limits.daily;
   double get _weeklyBudgetLimit => _accountData.limits.weekly;
   double get _monthlyBudgetLimit => _accountData.limits.monthly;
@@ -157,6 +160,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     WidgetsBinding.instance.addObserver(this);
     _accountData.addListener(_applyAccountData);
     _accountData.start();
+    _applyAccountData();
 
     _intentDataStreamSubscription = ReceiveSharingIntent.instance
         .getMediaStream()
@@ -188,6 +192,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _accountData.removeListener(_applyAccountData);
+    _planSubscription?.cancel();
     _intentDataStreamSubscription.cancel();
     for (final finish in _setupWaiters.toList()) {
       finish();
@@ -206,6 +211,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       if (_visibleUid != _accountData.uid) {
         _visibleUid = _accountData.uid;
         _selectedIndex = 0;
+        _watchPlan(_visibleUid);
       }
       _transactionHistory = _accountData.history;
     });
@@ -216,6 +222,26 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         _dailyBudgetLimit,
       ),
     );
+  }
+
+  void _watchPlan(String? uid) {
+    _planSubscription?.cancel();
+    _planSubscription = null;
+    _isPremium = false;
+    if (uid == null) return;
+    _planSubscription = ProfilePlanStore(FirebaseFirestore.instance)
+        .watchVip(uid)
+        .listen(
+          (premium) {
+            if (!mounted || _accountData.uid != uid) return;
+            setState(() => _isPremium = premium);
+          },
+          onError: (Object error) {
+            if (!mounted || _accountData.uid != uid) return;
+            setState(() => _isPremium = false);
+            debugPrint('Gagal memuat paket akun: $error');
+          },
+        );
   }
 
   void _consumeSharedImage() {
@@ -525,6 +551,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         index: _selectedIndex,
         children: [
           DashboardScreen(
+            isPremium: _isPremium,
             key: ValueKey(_accountData.uid),
             history: _transactionHistory,
             dailyLimit: _dailyBudgetLimit,
@@ -532,6 +559,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
             budgetCategories: _accountData.limits.trackedCategories,
           ),
           TransactionHistoryScreen(
+            isPremium: _isPremium,
             key: ValueKey('history-${_accountData.uid}'),
             history: _transactionHistory,
             importRevision: _accountData.transactionRevision,
@@ -546,6 +574,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
                 _performEdit(() => _accountData.updateDetails(tx)),
           ),
           IncomeScreen(
+            isPremium: _isPremium,
             key: ValueKey('income-${_accountData.uid}'),
             history: _transactionHistory,
             onAddIncome: () => _recordManualExpense(isIncome: true),
@@ -556,6 +585,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
                 _performEdit(() => _accountData.updateDetails(tx)),
           ),
           PersonalizationScreen(
+            loggedInTier: _isPremium ? UserTier.premium : UserTier.free,
             userName: _userName,
             dailyLimit: _dailyBudgetLimit,
             weeklyLimit: _weeklyBudgetLimit,

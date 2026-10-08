@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../models/transaction_model.dart';
+import '../models/plan_access.dart';
 import '../services/transaction_classifier.dart';
 import '../services/export_service.dart';
 import '../models/budget_limits.dart';
@@ -10,6 +11,7 @@ import '../services/monthly_report_service.dart';
 import '../services/transaction_sheet_service.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
+  final bool isPremium;
   final bool incomeOnly;
   final Future<void> Function()? onAddIncome;
   final List<TransactionModel> history;
@@ -24,6 +26,7 @@ class TransactionHistoryScreen extends StatefulWidget {
 
   const TransactionHistoryScreen({
     super.key,
+    this.isPremium = false,
     this.incomeOnly = false,
     this.onAddIncome,
     required this.history,
@@ -49,6 +52,27 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _sortOrder = 'Paling baru';
   bool _exportingPdf = false;
   bool _sheetBusy = false;
+  late final _premiumAccess = ValueNotifier(widget.isPremium);
+
+  @override
+  void didUpdateWidget(covariant TransactionHistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isPremium != widget.isPremium) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _premiumAccess.value = widget.isPremium;
+      });
+    }
+    if (_selectedMonthOffset >=
+        PlanAccess(isPremium: widget.isPremium).monthCount) {
+      _selectedMonthOffset = -1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _premiumAccess.dispose();
+    super.dispose();
+  }
 
   Future<void> _showSheetActions() async {
     final action = await showModalBottomSheet<String>(
@@ -186,68 +210,86 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
   Future<void> _downloadMonthlyReport() async {
     final now = DateTime.now();
-    final available = <DateTime>{
-      DateTime(now.year, now.month),
-      ...widget.history.map((t) => DateTime(t.dateTime.year, t.dateTime.month)),
-    }.toList()..sort((a, b) => b.compareTo(a));
-    var selected = available.first;
+    var selected = DateTime(now.year, now.month);
     final nameController = TextEditingController(text: widget.userName);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
-          title: const Text('Laporan bulanan PDF'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  maxLength: 100,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama pada laporan',
-                  ),
+      builder: (dialogContext) => ValueListenableBuilder<bool>(
+        valueListenable: _premiumAccess,
+        builder: (context, premium, _) => StatefulBuilder(
+          builder: (context, update) {
+            final access = PlanAccess(isPremium: premium);
+            final available = access.months(DateTime.now());
+            if (!available.contains(selected)) selected = available.first;
+            return AlertDialog(
+              title: const Text('Laporan bulanan PDF'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      maxLength: 100,
+                      decoration: const InputDecoration(
+                        labelText: 'Nama pada laporan',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<DateTime>(
+                      key: ValueKey('report-month-${access.monthCount}'),
+                      initialValue: selected,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Bulan laporan',
+                      ),
+                      items: available
+                          .map(
+                            (m) => DropdownMenuItem(
+                              value: m,
+                              child: Text(MonthlyReportService.monthLabel(m)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (m) {
+                        if (m != null) update(() => selected = m);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'PDF berisi ringkasan budget, grafik, perbandingan, rekap harian, dan rincian transaksi. Simpan PDF melalui menu berbagi.',
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<DateTime>(
-                  initialValue: selected,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Bulan laporan'),
-                  items: available
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m,
-                          child: Text(MonthlyReportService.monthLabel(m)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (m) {
-                    if (m != null) update(() => selected = m);
-                  },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Batal'),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'PDF berisi ringkasan budget, grafik, perbandingan, rekap harian, dan rincian transaksi. Simpan PDF melalui menu berbagi.',
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Buat PDF'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Batal'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Buat PDF'),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
     final name = nameController.text.trim();
     nameController.dispose();
     if (confirmed != true || !mounted) return;
+    if (!PlanAccess(isPremium: widget.isPremium)
+        .includes(selected, DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Bulan ini tidak tersedia untuk paket akunmu. Pilih ulang bulan laporan.',
+          ),
+        ),
+      );
+      return;
+    }
     final box = context.findRenderObject() as RenderBox?;
     final origin = box == null
         ? const Rect.fromLTWH(0, 0, 1, 1)
@@ -572,8 +614,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final firstMonth = DateTime(now.year, now.month - 3);
-    final nextMonth = DateTime(now.year, now.month + 1);
+    final access = PlanAccess(isPremium: widget.isPremium);
     final selectedMonth = DateTime(now.year, now.month - _selectedMonthOffset);
     final filteredHistory =
         widget.history.where((tx) {
@@ -585,11 +626,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           final matchesPaymentMethod =
               _selectedPaymentMethod == 'Semua' ||
               tx.paymentMethod == _selectedPaymentMethod;
-          final matchesMonth = _selectedMonthOffset == -1
-              ? !tx.dateTime.isBefore(firstMonth) &&
-                    tx.dateTime.isBefore(nextMonth)
-              : tx.dateTime.year == selectedMonth.year &&
-                    tx.dateTime.month == selectedMonth.month;
+          final matchesMonth =
+              access.includes(tx.dateTime, now) &&
+              (_selectedMonthOffset == -1 ||
+                  (tx.dateTime.year == selectedMonth.year &&
+                      tx.dateTime.month == selectedMonth.month));
           return matchesSearch &&
               matchesCategory &&
               matchesPaymentMethod &&
@@ -776,7 +817,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    for (var offset = 0; offset <= 3; offset++)
+                    for (var offset = 0; offset < access.monthCount; offset++)
                       DropdownMenuItem(
                         value: offset,
                         child: Text(
