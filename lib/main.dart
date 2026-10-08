@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show appFlavor;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -114,7 +115,7 @@ class _JajankuAppState extends State<JajankuApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Jajanku',
+      title: appFlavor == 'dev' ? 'Jajanku (Dev)' : 'Jajanku',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
@@ -507,7 +508,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Jajanku',
+              appFlavor == 'dev' ? 'Jajanku (Dev)' : 'Jajanku',
               style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800),
             ),
             Text(

@@ -401,69 +401,6 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
     }
   }
 
-  Future<void> _importLocal() async {
-    final data = AccountDataService.instance;
-    final owner = data.uid;
-    if (owner == null) return;
-    setState(() => _loading = true);
-    try {
-      final count = await data.importCount();
-      if (!mounted || data.uid != owner) return;
-      if (count == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tidak ada transaksi lokal untuk dipindahkan.'),
-          ),
-        );
-        return;
-      }
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Pindahkan transaksi lokal?'),
-          content: Text(
-            '$count transaksi dari HP ini akan dipindahkan ke akun '
-            '${AuthService.instance.currentUser?.email ?? ''}. '
-            'Setelah tersimpan di cloud, transaksi tersebut tidak lagi tampil di Guest. '
-            'Pemindahan memerlukan internet.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Pindahkan'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
-      final moved = await data.importGuest(owner);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$moved transaksi berhasil dipindahkan ke cloud.'),
-          ),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Pemindahan belum selesai. Periksa internet dan coba lagi dengan akun yang sama.',
-            ),
-          ),
-        );
-      }
-      debugPrint('Import transaksi: $error');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
   Widget _syncCard() => ListenableBuilder(
     listenable: AccountDataService.instance,
     builder: (context, _) {
@@ -490,18 +427,6 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
                   onPressed: () => data.retry(),
                   child: const Text('Coba sinkronkan lagi'),
                 ),
-              if (data.uid != null) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _loading || data.importing ? null : _importLocal,
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: Text(
-                    data.importing
-                        ? 'Memindahkan…'
-                        : 'Pindahkan transaksi dari HP ini',
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -632,9 +557,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
             subtitle: 'Panduan mencatat, budget, laporan, dan FAQ',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute<void>(
-                builder: (_) => const UsageGuideScreen(),
-              ),
+              MaterialPageRoute<void>(builder: (_) => const UsageGuideScreen()),
             ),
           ),
           if (BudgetNotificationService.isSupported)

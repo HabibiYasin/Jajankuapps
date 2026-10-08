@@ -41,15 +41,4 @@ class CloudAccountStore {
       numericNominal: (map['numericNominal'] as num).toDouble(),
     );
   }
-
-  // The marker prevents a retry from overwriting edits or resurrecting a
-  // transaction deleted on another device after a successful import.
-  Future<void> importOnce(String uid, String id, TransactionModel tx) async {
-    final marker = firestore.doc('users/$uid/imports/$id');
-    await firestore.runTransaction((batch) async {
-      if ((await batch.get(marker)).exists) return;
-      batch.set(transactions(uid).doc(id), encode(tx));
-      batch.set(marker, {'completed': true});
-    });
-  }
 }

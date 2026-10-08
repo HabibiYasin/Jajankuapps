@@ -17,6 +17,11 @@ Kedua aplikasi bisa dipasang bersamaan. SQLite dan preferensi lokal terpisah
 karena Application ID berbeda. Mengganti mode debug/release tidak mengganti
 Firebase. Project Firebase prod menggunakan konfigurasi yang sudah ada.
 
+Dev memakai ikon oranye dari `assets/icon/app_icon_dev.png` dan judul atas
+`Jajanku (Dev)`. Untuk membuat ulang ikon Android dev, jalankan
+`dart run flutter_launcher_icons`. Konfigurasi flavor ada di
+`flutter_launcher_icons-dev.yaml`; hasilnya ditulis ke resource `src/dev`.
+
 ## Menjalankan aplikasi sekarang
 
 ```powershell
@@ -121,10 +126,10 @@ Unduh ulang JSON prod bila diperlukan dan uji melalui internal testing Play.
 - Pastikan rules prod sudah dipublish; keberadaan file lokal tidak berarti
   rules produksi sudah terpasang.
 - Deploy selalu dengan `--project` eksplisit agar tujuan jelas.
-- Uji perpindahan akun, offline/online, impor Guest, ekspor, dan hapus akun
+- Uji perpindahan akun, offline/online, impor Excel, ekspor, dan hapus akun
   pada Firebase dev sebelum memvalidasi build prod.
-- Dev yang sudah berisi data lokal Guest tetap perlu tindakan impor pengguna
-  untuk memindahkannya ke akun dev. Data dev tidak otomatis pindah ke prod.
+- Data Guest dan data akun disimpan terpisah. Login tidak memindahkan transaksi
+  Guest ke akun. Data dev tidak otomatis pindah ke prod.
 
 Referensi:
 - https://docs.flutter.dev/deployment/flavors

@@ -334,10 +334,9 @@ const List<_GuideTopic> _topics = [
       (
         title: 'Kenapa data Guest tidak langsung muncul setelah login?',
         body:
-            'Data Guest di HP dan data akun dikelola terpisah. Setelah login, '
-            'buka Personalisasi > Pindahkan transaksi dari HP ini. Periksa '
-            'akun tujuan lalu konfirmasi. Proses ini membutuhkan internet; '
-            'transaksi yang berhasil dipindahkan tidak lagi tampil di Guest.',
+            'Data Guest tersimpan di HP, sedangkan data akun tersimpan '
+            'terpisah di cloud. Setelah login, riwayat menampilkan transaksi '
+            'akun tersebut. Untuk melihat data Guest lagi, keluar dari akun.',
       ),
       (
         title: 'Apa yang dilakukan kalau data belum tersinkron?',

@@ -411,57 +411,8 @@ class AccountDataService extends ChangeNotifier {
     }
   }
 
-  Future<int> importCount() async {
-    final owner = uid;
-    if (owner == null) return 0;
-    return (await DatabaseHelper.instance.importCandidates(owner)).length;
-  }
-
-  Future<int> importGuest(String expectedUid) async {
-    _checkOwner(expectedUid);
-    if (importing) throw StateError('Pemindahan masih berjalan');
-    importing = true;
-    _emit();
-    var count = 0;
-    try {
-      final rows = await DatabaseHelper.instance.importCandidates(expectedUid);
-      for (final row in rows) {
-        _checkOwner(expectedUid);
-        final id = await DatabaseHelper.instance.claimImport(
-          row['id'] as int,
-          expectedUid,
-          _cloud.transactions(expectedUid).doc().id,
-        );
-        _checkOwner(expectedUid);
-        await _cloud
-            .importOnce(
-              expectedUid,
-              id,
-              TransactionModel(
-                type: (row['type'] as String?) ?? 'expense',
-                merchant: row['merchant'] as String,
-                nominalStr: row['nominalStr'] as String,
-                dateTime: DateTime.parse(row['dateTime'] as String),
-                category: row['category'] as String,
-                source: (row['source'] as String?) ?? 'QRIS Umum',
-                paymentMethod: (row['paymentMethod'] as String?) ?? 'QRIS',
-                numericNominal: (row['numericNominal'] as num).toDouble(),
-              ),
-            )
-            .timeout(const Duration(seconds: 20));
-        // Remove the local copy only after the server confirms the atomic import.
-        await DatabaseHelper.instance.finishImport(row['id'] as int);
-        count++;
-      }
-      return count;
-    } finally {
-      importing = false;
-      _emit();
-    }
-  }
-
   Future<void> beforeSignOut() async {
-    if (importing) throw StateError('Tunggu pemindahan transaksi selesai.');
+    if (importing) throw StateError('Tunggu proses impor selesai.');
     if (uid != null) {
       await _cloud.firestore.waitForPendingWrites().timeout(
         const Duration(seconds: 10),

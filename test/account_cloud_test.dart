@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_application_1/models/budget_limits.dart';
 import 'package:flutter_application_1/models/transaction_model.dart';
 import 'package:flutter_application_1/services/account_data_service.dart';
-import 'package:flutter_application_1/services/cloud_account_store.dart';
 
 TransactionModel sample({double amount = 62500}) => TransactionModel(
   merchant: 'Warung',
@@ -138,28 +137,6 @@ void main() {
     await settle();
     expect(data.history, isEmpty);
   });
-
-  test(
-    'import retry neither duplicates nor overwrites nor resurrects cloud rows',
-    () async {
-      final firestore = FakeFirebaseFirestore();
-      final cloud = CloudAccountStore(firestore);
-      await cloud.importOnce('alice', 'stable-id', sample());
-      await cloud.transactions('alice').doc('stable-id').update({
-        'merchant': 'Changed elsewhere',
-      });
-      await cloud.importOnce('alice', 'stable-id', sample());
-      expect((await cloud.transactions('alice').get()).docs, hasLength(1));
-      expect(
-        (await cloud.transactions('alice').doc('stable-id').get())
-            .data()!['merchant'],
-        'Changed elsewhere',
-      );
-      await cloud.transactions('alice').doc('stable-id').delete();
-      await cloud.importOnce('alice', 'stable-id', sample());
-      expect((await cloud.transactions('alice').get()).docs, isEmpty);
-    },
-  );
 
   test('budget validation rejects zero, negative and non-finite values', () {
     for (final value in [0.0, -1.0, double.infinity, double.nan, 1e16]) {

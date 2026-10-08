@@ -90,7 +90,7 @@ Untuk pengguna yang menggunakan akun, beberapa informasi dapat disimpan melalui 
 
 Cache data akun juga dapat tersimpan di perangkat agar aplikasi tetap dapat menampilkan informasi ketika koneksi internet terbatas.
 
-Jika pengguna memilih untuk memindahkan transaksi dari mode Guest ke akun, pemindahan tersebut hanya dilakukan berdasarkan tindakan atau pilihan pengguna.
+Data Guest di perangkat dan data akun di cloud disimpan terpisah. Login tidak memindahkan transaksi Guest ke akun.
 
 ## Layanan Pihak Ketiga
 

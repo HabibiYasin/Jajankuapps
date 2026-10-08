@@ -94,7 +94,7 @@ class DatabaseHelper {
     final db = await database;
     await db.transaction((txn) async {
       checkOwner();
-      // Rows reserved for a cloud migration belong to that account.
+      // Preserve legacy rows reserved for accounts by older app versions.
       await txn.delete(
         'transactions',
         where: 'id NOT IN (SELECT localId FROM cloud_imports)',
@@ -138,44 +138,6 @@ class DatabaseHelper {
           ),
         )
         .toList();
-  }
-
-  // Claims survive crashes and reserve a local row for exactly one account.
-  Future<List<Map<String, Object?>>> importCandidates(String uid) async {
-    final db = await database;
-    return db.rawQuery(
-      '''
-      SELECT t.*, c.cloudId FROM transactions t
-      LEFT JOIN cloud_imports c ON t.id = c.localId
-      WHERE c.uid IS NULL OR c.uid = ?
-    ''',
-      [uid],
-    );
-  }
-
-  Future<String> claimImport(int localId, String uid, String cloudId) async {
-    final db = await database;
-    return db.transaction((txn) async {
-      await txn.insert('cloud_imports', {
-        'localId': localId,
-        'uid': uid,
-        'cloudId': cloudId,
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
-      final row = (await txn.query(
-        'cloud_imports',
-        where: 'localId = ?',
-        whereArgs: [localId],
-      )).single;
-      if (row['uid'] != uid) {
-        throw StateError('Transaksi sudah dipilih akun lain');
-      }
-      return row['cloudId'] as String;
-    });
-  }
-
-  Future<void> finishImport(int localId) async {
-    final db = await database;
-    await db.delete('transactions', where: 'id = ?', whereArgs: [localId]);
   }
 
   // UPDATE: Ubah Tanggal Transaksi

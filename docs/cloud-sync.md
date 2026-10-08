@@ -20,18 +20,15 @@ Project: `jajanku-26976`, database `(default)` di `asia-southeast2`.
 - Foto struk dan nama profil kustom belum disinkronkan; fitur ini mencakup
   data transaksi dan limit budget. Guest memiliki budget lokal terpisah.
 
-## Memindahkan transaksi lama
+## Data Guest dan akun
 
-Personalisasi → Pindahkan transaksi dari HP ini → konfirmasi akun tujuan.
-Tidak ada upload otomatis untuk data Guest. Pemindahan memerlukan internet.
+Data Guest tetap tersimpan lokal dan terpisah dari data akun. Login menampilkan
+transaksi akun tanpa memindahkan transaksi Guest. Keluar dari akun untuk melihat
+riwayat Guest kembali. Fitur pemindahan Guest ke akun sudah dihapus.
 
-Setiap baris lokal dikunci ke UID tujuan dan ID cloud yang disimpan di SQLite
-sebelum upload. Transaksi Firestore secara atomik menulis data dan penanda
-`users/{uid}/imports/{id}`. Baris lokal baru dihapus setelah server mengonfirmasi.
-Jika terputus, login akun tujuan yang sama dan tekan tombol pemindahan lagi.
-Penanda mencegah duplikasi, menimpa edit, atau memunculkan kembali transaksi
-yang sudah dihapus setelah pemindahan berhasil. Baris yang sedang dipindahkan
-tidak tersedia untuk akun lain atau Guest.
+Tabel lokal `cloud_imports` dan filter baris yang pernah dicadangkan tetap
+dipertahankan untuk kompatibilitas data versi lama. Aplikasi tidak lagi membuat
+pemindahan baru. Penanda impor cloud lama tetap dibersihkan saat hapus akun.
 
 ## Aturan akses
 
@@ -55,10 +52,10 @@ flutter build apk --debug
 ```
 
 Tes Dart memakai Firestore palsu untuk sinkronisasi dua klien, isolasi akun,
-CRUD, validasi budget, dan impor idempoten. Aturan akses diuji terpisah pada
+CRUD dan validasi budget. Aturan akses diuji terpisah pada
 emulator resmi dengan 27 pemeriksaan (tanpa data produksi).
 
-Uji perangkat: login, pindahkan data lokal dengan konfirmasi, ubah budget,
+Uji perangkat: login, ubah budget,
 dan pastikan status menunjukkan tersinkron. Login akun yang sama di HP kedua
 untuk memeriksa data. Uji tambah/edit/hapus saat offline, sambungkan kembali,
 dan periksa sinkronisasi. Ganti akun untuk memeriksa pemisahan riwayat.
