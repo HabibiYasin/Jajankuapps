@@ -57,7 +57,7 @@ class AccountDataService extends ChangeNotifier {
           ? 'Perubahan menunggu tersimpan ke cloud'
           : _txCached || _budgetCached
           ? 'Menampilkan data lokal; menunggu koneksi cloud'
-          : 'Data tersinkron ke cloud');
+          : '');
 
   void start() {
     if (_started) return;

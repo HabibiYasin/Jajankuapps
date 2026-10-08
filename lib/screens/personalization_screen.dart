@@ -405,6 +405,8 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
     listenable: AccountDataService.instance,
     builder: (context, _) {
       final data = AccountDataService.instance;
+      final status = data.status;
+      if (status.isEmpty) return const SizedBox.shrink();
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -419,7 +421,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
                         : Icons.cloud_outlined,
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(data.status)),
+                  Expanded(child: Text(status)),
                 ],
               ),
               if (data.error != null)
