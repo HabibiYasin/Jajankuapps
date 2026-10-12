@@ -12,6 +12,8 @@ class NotificationSettingsScreen extends StatefulWidget {
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
   bool? _notificationsEnabled;
+  bool? _thresholdEnabled;
+  bool _savingThreshold = false;
   bool? _noonEnabled;
   bool _savingNoon = false;
   bool _savingNotifications = false;
@@ -25,10 +27,13 @@ class _NotificationSettingsScreenState
   Future<void> _loadNotifications() async {
     try {
       final enabled = await BudgetNotificationService.isEnabled();
+      final thresholdEnabled =
+          await BudgetNotificationService.isThresholdEnabled();
       final noonEnabled = await BudgetNotificationService.isNoonEnabled();
       if (mounted) {
         setState(() {
           _notificationsEnabled = enabled;
+          _thresholdEnabled = thresholdEnabled;
           _noonEnabled = noonEnabled;
           _notificationLoadFailed = false;
         });
@@ -56,6 +61,24 @@ class _NotificationSettingsScreenState
     }
   }
 
+  Future<void> _toggleThreshold(bool enabled) async {
+    setState(() => _savingThreshold = true);
+    try {
+      await BudgetNotificationService.setThresholdEnabled(enabled);
+      if (mounted) setState(() => _thresholdEnabled = enabled);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Peringatan budget gagal disimpan. Coba lagi.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingThreshold = false);
+    }
+  }
+
   Future<void> _toggleNoon(bool enabled) async {
     setState(() => _savingNoon = true);
     try {
@@ -65,7 +88,7 @@ class _NotificationSettingsScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Pengingat jam 12 gagal disimpan. Coba lagi.'),
+            content: Text('Pengingat jam 13 gagal disimpan. Coba lagi.'),
           ),
         );
       }
@@ -96,10 +119,21 @@ class _NotificationSettingsScreenState
                     : _toggleNotifications,
               ),
               SwitchListTile(
-                secondary: const Icon(Icons.wb_sunny_outlined),
-                title: const Text('Pengingat jam 12 siang'),
+                secondary: const Icon(Icons.warning_amber_rounded),
+                title: const Text('Peringatan batas budget'),
                 subtitle: const Text(
-                  'Cek persentase budget terpakai setiap pukul 12.00.',
+                  'Beri tahu saat budget harian melewati 50%, 75%, dan 100%.',
+                ),
+                value: _thresholdEnabled ?? true,
+                onChanged: _thresholdEnabled == null || _savingThreshold
+                    ? null
+                    : _toggleThreshold,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.wb_sunny_outlined),
+                title: const Text('Pengingat jam 1 siang'),
+                subtitle: const Text(
+                  'Ingatkan pukul 13.00 jika budget harian masih 0%.',
                 ),
                 value: _noonEnabled ?? true,
                 onChanged: _noonEnabled == null || _savingNoon

@@ -27,7 +27,19 @@ object BudgetNotification {
     private const val ID = 4201
     private const val NOON_ID = 4203
     private const val NOON_CHANNEL = "daily_budget_noon_reminder"
+    private const val THRESHOLD_ID = 4204
+    private const val THRESHOLD_CHANNEL = "daily_budget_threshold_alerts"
     const val NOON_ACTION = "com.jajanku.app.BUDGET_NOON"
+
+    fun isThresholdEnabled(context: Context): Boolean =
+        context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
+            .getBoolean("threshold_enabled", true)
+
+    fun setThresholdEnabled(context: Context, enabled: Boolean) {
+        check(context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
+            .edit().putBoolean("threshold_enabled", enabled).commit())
+        refresh(context)
+    }
 
     fun isNoonEnabled(context: Context): Boolean =
         context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
@@ -57,8 +69,9 @@ object BudgetNotification {
         val now = Calendar.getInstance()
         val scheduled = prefs.getLong("noon_scheduled_at", 0)
         val scheduledDate = Calendar.getInstance().apply { timeInMillis = scheduled }
-        // Keep today's delayed alarm when a transaction sync happens just after noon.
+        // Migrate the old 12:00 alarm, but preserve today's delayed 13:00 alarm.
         if (!force && existing != null && scheduled > 0 &&
+            scheduledDate.get(Calendar.HOUR_OF_DAY) == 13 &&
             (scheduled > now.timeInMillis ||
                 (scheduledDate.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
                  scheduledDate.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)))) return
@@ -75,24 +88,23 @@ object BudgetNotification {
         val prefs = context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
         if (!prefs.contains("totals")) return
         val now = Calendar.getInstance()
-        if (now.get(Calendar.HOUR_OF_DAY) < 12) return
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now.time)
         if (prefs.getString("last_noon_date", null) == date) return
+        val total = JSONObject(prefs.getString("totals", "{}") ?: "{}").optDouble(date, 0.0)
+        val limit = prefs.getFloat("limit", 50000f).toDouble()
+        if (!NoonBudgetReminder.shouldNotify(total, limit, now)) return
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(
                 Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (!manager.areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 26) {
             manager.createNotificationChannel(NotificationChannel(NOON_CHANNEL,
-                "Pengingat budget jam 12", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Pengingat siang berdasarkan persentase budget harian yang terpakai"
+                "Pengingat budget jam 13", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Pengingat pukul 13.00 jika budget harian masih 0%"
             })
             if (manager.getNotificationChannel(NOON_CHANNEL)?.importance == NotificationManager.IMPORTANCE_NONE) return
         }
-        val total = JSONObject(prefs.getString("totals", "{}") ?: "{}").optDouble(date, 0.0)
-        val limit = prefs.getFloat("limit", 50000f).toDouble()
-        if (!total.isFinite() || total < 0 || !limit.isFinite() || limit <= 0) return
-        val message = NoonBudgetReminder.message(total / limit * 100, now.get(Calendar.DAY_OF_YEAR))
+        val message = NoonBudgetReminder.message()
         val open = PendingIntent.getActivity(context, NOON_ID,
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -142,8 +154,10 @@ object BudgetNotification {
 
     fun refresh(context: Context, rescheduleNoon: Boolean = false) {
         scheduleNoon(context, force = rescheduleNoon)
+        showThreshold(context)
         if (!isEnabled(context)) {
             cancel(context)
+            if (isThresholdEnabled(context)) scheduleMidnight(context)
             return
         }
         val prefs = context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
@@ -211,6 +225,56 @@ object BudgetNotification {
             builder.setContent(views)
         }
         manager.notify(ID, builder.build())
+    }
+
+    private fun showThreshold(context: Context) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (!isThresholdEnabled(context)) {
+            manager.cancel(THRESHOLD_ID)
+            return
+        }
+        val prefs = context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
+        if (!prefs.contains("totals")) return
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)
+        val lastDate = prefs.getString("last_threshold_date", null)
+        if (lastDate != date) manager.cancel(THRESHOLD_ID)
+        val total = JSONObject(prefs.getString("totals", "{}") ?: "{}").optDouble(date, 0.0)
+        val limit = prefs.getFloat("limit", 50000f).toDouble()
+        val threshold = BudgetThresholdAlert.nextThreshold(total, limit, date, lastDate,
+            prefs.getInt("last_threshold", 0)) ?: return
+        if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(
+                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        if (!manager.areNotificationsEnabled()) return
+        if (Build.VERSION.SDK_INT >= 26) {
+            manager.createNotificationChannel(NotificationChannel(THRESHOLD_CHANNEL,
+                "Peringatan batas budget", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Peringatan saat budget harian melewati 50%, 75%, dan 100%"
+            })
+            if (manager.getNotificationChannel(THRESHOLD_CHANNEL)?.importance == NotificationManager.IMPORTANCE_NONE) return
+        }
+        val money = NumberFormat.getIntegerInstance(Locale.forLanguageTag("id-ID"))
+        val title = "Budget harian melewati $threshold%"
+        val body = "Pengeluaran hari ini Rp${money.format(total)} dari budget Rp${money.format(limit)}. " +
+            if (threshold == 100) "Budget sudah terlampaui. Ketuk untuk cek pengeluaranmu."
+            else "Ketuk untuk cek sisa budgetmu."
+        val open = PendingIntent.getActivity(context, THRESHOLD_ID,
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(context, THRESHOLD_CHANNEL)
+            else Notification.Builder(context)
+        builder.setSmallIcon(R.drawable.ic_budget_notification)
+            .setContentTitle(title).setContentText(body)
+            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setContentIntent(open).setAutoCancel(true)
+            .setCategory(Notification.CATEGORY_REMINDER)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+        if (Build.VERSION.SDK_INT < 26) {
+            builder.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL)
+        }
+        manager.notify(THRESHOLD_ID, builder.build())
+        prefs.edit().putString("last_threshold_date", date)
+            .putInt("last_threshold", threshold).apply()
     }
 
     private fun scheduleMidnight(context: Context) {

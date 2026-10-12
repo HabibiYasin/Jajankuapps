@@ -23,6 +23,18 @@ class BudgetNotificationService {
     return await _channel.invokeMethod<bool>('getNoonEnabled') ?? true;
   }
 
+  static Future<bool> isThresholdEnabled() async {
+    if (!isSupported) return false;
+    return await _channel.invokeMethod<bool>('getThresholdEnabled') ?? true;
+  }
+
+  static Future<void> setThresholdEnabled(bool enabled) async {
+    if (!isSupported) return;
+    await _channel.invokeMethod<void>('setThresholdEnabled', {
+      'enabled': enabled,
+    });
+  }
+
   static Future<void> setNoonEnabled(bool enabled) async {
     if (!isSupported) return;
     await _channel.invokeMethod<void>('setNoonEnabled', {'enabled': enabled});

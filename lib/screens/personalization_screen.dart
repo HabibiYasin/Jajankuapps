@@ -566,7 +566,8 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
             _menuTile(
               icon: Icons.notifications_outlined,
               title: 'Notifikasi',
-              subtitle: 'Atur notifikasi persistent dan pengingat jam 12 siang',
+              subtitle:
+                  'Atur progres, peringatan budget, dan pengingat jam 1 siang',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute<void>(

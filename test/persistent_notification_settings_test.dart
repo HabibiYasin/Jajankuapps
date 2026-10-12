@@ -105,6 +105,73 @@ void main() {
   );
 
   testWidgets(
+    'threshold alerts save independently and retain their value after failure',
+    (tester) async {
+      var threshold = true;
+      var shouldFail = true;
+      final changes = <bool>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            switch (call.method) {
+              case 'getEnabled':
+              case 'getNoonEnabled':
+                return false;
+              case 'getThresholdEnabled':
+                return threshold;
+              case 'setThresholdEnabled':
+                if (shouldFail) {
+                  throw PlatformException(code: 'BUDGET_NOTIFICATION');
+                }
+                threshold = (call.arguments as Map)['enabled'] as bool;
+                changes.add(threshold);
+              case 'setEnabled':
+              case 'setNoonEnabled':
+                fail('Threshold alerts must not change other preferences');
+            }
+            return null;
+          });
+      final toggle = find.widgetWithText(
+        SwitchListTile,
+        'Peringatan batas budget',
+      );
+      await tester.pumpWidget(settings);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(toggle).value, true);
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(toggle).value, true);
+      expect(
+        find.text('Peringatan budget gagal disimpan. Coba lagi.'),
+        findsOneWidget,
+      );
+      shouldFail = false;
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(threshold, false);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(settings);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(toggle).value, false);
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(changes, [false, true]);
+      for (final title in ['Notifikasi persistent', 'Pengingat jam 1 siang']) {
+        expect(
+          tester
+              .widget<SwitchListTile>(
+                find.widgetWithText(SwitchListTile, title),
+              )
+              .value,
+          false,
+        );
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
     'noon reminders can be enabled independently of persistent notifications',
     (tester) async {
       var persistent = false;
@@ -127,7 +194,7 @@ void main() {
       await tester.pumpAndSettle();
       final noonToggle = find.widgetWithText(
         SwitchListTile,
-        'Pengingat jam 12 siang',
+        'Pengingat jam 1 siang',
       );
       final persistentToggle = find.widgetWithText(
         SwitchListTile,

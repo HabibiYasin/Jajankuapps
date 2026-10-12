@@ -15,6 +15,14 @@ class MainActivity : FlutterActivity() {
             try {
                 when (call.method) {
                     "getEnabled" -> result.success(BudgetNotification.isEnabled(this))
+                    "getThresholdEnabled" -> result.success(BudgetNotification.isThresholdEnabled(this))
+                    "setThresholdEnabled" -> {
+                        val enabled = call.argument<Boolean>("enabled")
+                            ?: throw IllegalArgumentException("Pilihan peringatan tidak valid")
+                        BudgetNotification.setThresholdEnabled(this, enabled)
+                        if (enabled) requestBudgetNotificationPermission(explicit = true)
+                        result.success(null)
+                    }
                     "getNoonEnabled" -> result.success(BudgetNotification.isNoonEnabled(this))
                     "setNoonEnabled" -> {
                         val enabled = call.argument<Boolean>("enabled")
@@ -48,7 +56,8 @@ class MainActivity : FlutterActivity() {
 
     private fun requestBudgetNotificationPermission(explicit: Boolean = false) {
         val prefs = getSharedPreferences("budget_notification", MODE_PRIVATE)
-        if ((BudgetNotification.isEnabled(this) || BudgetNotification.isNoonEnabled(this)) && Build.VERSION.SDK_INT >= 33 &&
+        if ((BudgetNotification.isEnabled(this) || BudgetNotification.isNoonEnabled(this) ||
+                BudgetNotification.isThresholdEnabled(this)) && Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
             (explicit || !prefs.getBoolean("permission_requested", false))) {
             prefs.edit().putBoolean("permission_requested", true).apply()
