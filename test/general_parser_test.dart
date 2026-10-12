@@ -131,7 +131,7 @@ Nominal Rp150.000
     expect(tx.paymentMethod, 'Transfer');
   });
 
-  test('generic labels cannot impersonate Mandiri or BCA Syariah', () {
+  test('known sources cannot be overridden by another bank layout', () {
     for (final name in ['SeaBank', 'Bank Mega Syariah', 'BCA Digital']) {
       final tx = QrisParser.parseReceipt('''
 $name
@@ -146,6 +146,7 @@ Total transaksi Rp25.000
     final tx = QrisParser.parseReceipt(
       'Sumber dana\nTujuan WARUNG AYAM\nTotal transaksi Rp25.000',
     );
+    // Shared field labels alone cannot establish the issuing bank.
     expect(tx.source, 'Tidak Diketahui');
     expect(tx.numericNominal, 25000);
     for (final header in [

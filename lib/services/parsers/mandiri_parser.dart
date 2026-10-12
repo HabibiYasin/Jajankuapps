@@ -1,4 +1,5 @@
 import '../../models/transaction_model.dart';
+import '../receipt_amount.dart';
 
 /// Parser bukti transaksi Mandiri / Livin' dari teks hasil OCR.
 /// Saat ini digunakan oleh alur OCR pembayaran QRIS.
@@ -9,48 +10,18 @@ class MandiriParser {
   // Deteksi apakah struk berasal dari Livin' by Mandiri
   static bool isMatch(String rawText) {
     String lower = rawText.toLowerCase();
-    return lower.contains("livin'") || lower.contains("by mandiri") || (lower.contains("penerima") && lower.contains("total transaksi") && lower.contains("sumber dana"));
+    return lower.contains("livin'") ||
+        lower.contains("by mandiri") ||
+        (lower.contains("penerima") &&
+            lower.contains("total transaksi") &&
+            lower.contains("sumber dana"));
   }
 
   /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> cleanedLines) {
     String merchantName = "Tidak Diketahui";
-    String nominalStr = "Rp0";
-    double numericVal = 0;
-
-    // 1. Ambil Nominal (Mencari baris "Total Transaksi" atau yang berawalan "Rp")
-    for (int i = 0; i < cleanedLines.length; i++) {
-      String line = cleanedLines[i];
-      String lower = line.toLowerCase();
-
-      if (lower.contains("total transaksi")) {
-        // Cek baris yang sama atau baris berikutnya
-        for (int j = i; j <= i + 1 && j < cleanedLines.length; j++) {
-          String target = cleanedLines[j];
-          if (target.contains("Rp") || target.contains("rp")) {
-            final match = RegExp(r'Rp[0-9.]+').firstMatch(target);
-            if (match != null) {
-              nominalStr = match.group(0)!;
-              break;
-            }
-          }
-        }
-        if (nominalStr != "Rp0") break;
-      }
-    }
-
-    if (nominalStr == "Rp0") {
-      for (String line in cleanedLines) {
-        if (line.toLowerCase().startsWith("rp")) {
-          nominalStr = line;
-          break;
-        }
-      }
-    }
-
-    // Normalisasi angka nominal ke double
-    String cleanNum = nominalStr.replaceAll(RegExp(r'[^0-9]'), '');
-    numericVal = double.tryParse(cleanNum) ?? 0;
+    final numericVal = ReceiptAmount.read(cleanedLines) ?? 0;
+    final nominalStr = ReceiptAmount.format(numericVal);
 
     // 2. Ambil Nama Merchant Mandiri (Label "Penerima")
     for (int i = 0; i < cleanedLines.length; i++) {
@@ -58,10 +29,22 @@ class MandiriParser {
       String lower = line.toLowerCase();
 
       if (lower == "penerima" || lower.startsWith("penerima")) {
+        final inline = line
+            .replaceFirst(
+              RegExp(r'^penerima\b\s*:?\s*', caseSensitive: false),
+              '',
+            )
+            .trim();
+        if (inline.isNotEmpty) {
+          merchantName = inline;
+          break;
+        }
         if (i + 1 < cleanedLines.length) {
           String part1 = cleanedLines[i + 1];
           // Cek apakah baris berikutnya masih bagian nama merchant sebelum masuk ke lokasi (misal KUNINGAN)
-          if (i + 2 < cleanedLines.length && !cleanedLines[i + 2].toLowerCase().contains("detail") && !cleanedLines[i + 2].toLowerCase().contains("sumber")) {
+          if (i + 2 < cleanedLines.length &&
+              !cleanedLines[i + 2].toLowerCase().contains("detail") &&
+              !cleanedLines[i + 2].toLowerCase().contains("sumber")) {
             // Jika baris berikutnya adalah kota/lokasi, ambil part1 saja
             merchantName = part1;
           } else {
@@ -94,9 +77,14 @@ class MandiriParser {
     // 3. Kategori Otomatis
     String category = "Tagihan & Pulsa";
     String lowerMerchant = merchantName.toLowerCase();
-    if (lowerMerchant.contains("konter") || lowerMerchant.contains("pulsa") || lowerMerchant.contains("token") || lowerMerchant.contains("pdam")) {
+    if (lowerMerchant.contains("konter") ||
+        lowerMerchant.contains("pulsa") ||
+        lowerMerchant.contains("token") ||
+        lowerMerchant.contains("pdam")) {
       category = "Tagihan & Pulsa";
-    } else if (lowerMerchant.contains("makan") || lowerMerchant.contains("kopi") || lowerMerchant.contains("roti")) {
+    } else if (lowerMerchant.contains("makan") ||
+        lowerMerchant.contains("kopi") ||
+        lowerMerchant.contains("roti")) {
       category = "Makanan";
     } else {
       category = "Belanja";
@@ -108,7 +96,7 @@ class MandiriParser {
       dateTime: DateTime.now(),
       category: category,
       numericNominal: numericVal,
-      source: "Livin' by Mandiri", 
+      source: "Livin' by Mandiri",
     );
   }
 }

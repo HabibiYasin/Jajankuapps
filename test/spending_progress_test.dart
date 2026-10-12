@@ -77,18 +77,21 @@ void main() {
     expect(progress(25).amountLabel(), 'Rp 25 / Rp 100');
   });
 
-  test('Each title provides five distinct messages and its own artwork', () {
+  test('Each title provides ten distinct messages and its own artwork', () {
     final assets = <String>{};
     for (final spent in [0.0, 25.0, 60.0, 90.0, 150.0]) {
       final data = progress(spent);
-      expect(data.messages.toSet().length, 5);
+      expect(data.messages.toSet().length, 10);
       assets.add(data.artworkAsset);
-      for (var variant = 0; variant < 5; variant++) {
+      for (var variant = 0; variant < data.messages.length; variant++) {
         expect(data.messageForVariant(variant), data.messages[variant]);
       }
-      expect(data.messageForVariant(5), data.messages.first);
+      expect(data.messageForVariant(data.messages.length), data.messages.first);
     }
     expect(assets.length, 5);
+    final noBudget = progress(0, budget: 0);
+    expect(noBudget.messages.toSet().length, 10);
+    expect(noBudget.messageForVariant(10), noBudget.messages.first);
   });
 
   test(

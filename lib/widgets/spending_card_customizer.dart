@@ -82,15 +82,52 @@ class SpendingCardCustomizer extends StatelessWidget {
         Text('Warna gambar', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         Wrap(
-          spacing: 8,
+          spacing: 0,
           runSpacing: 4,
           children: [
             for (final option in SpendingCardColor.values)
-              ChoiceChip(
-                label: Text(option.label),
-                avatar: CircleAvatar(backgroundColor: option.accent, radius: 8),
+              Semantics(
+                label: option.label,
+                button: true,
+                enabled: enabled,
                 selected: (cardColor ?? SpendingCardColor.orange) == option,
-                onSelected: enabled ? (_) => onColorChanged(option) : null,
+                child: Tooltip(
+                  message: option.label,
+                  excludeFromSemantics: true,
+                  child: InkResponse(
+                    onTap: enabled ? () => onColorChanged(option) : null,
+                    radius: 24,
+                    child: SizedBox.square(
+                      dimension: 48,
+                      child: Center(
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: option.accent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color:
+                                  (cardColor ?? SpendingCardColor.orange) ==
+                                      option
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child:
+                              (cardColor ?? SpendingCardColor.orange) == option
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
           ],
         ),

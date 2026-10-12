@@ -1,4 +1,5 @@
 import '../../models/transaction_model.dart';
+import '../receipt_status.dart';
 
 /// Parser bukti transaksi BNI / wondr dari teks hasil OCR.
 /// Saat ini digunakan oleh alur OCR pembayaran QRIS.
@@ -25,13 +26,7 @@ class BniParser {
   /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> lines) {
     final text = rawText.toLowerCase();
-    if (RegExp(
-      r'belum\s+berhasil|tidak\s+berhasil|gagal|sedang\s+diproses|tertunda|pending',
-    ).hasMatch(text)) {
-      throw const FormatException(
-        'Pembayaran BNI belum berhasil. Gunakan bukti pembayaran berhasil.',
-      );
-    }
+    ReceiptStatus.ensureSuccessful(rawText);
     final wondr = text.contains('wondr');
     final merchant = _field(lines, wondr ? 'Penerima' : 'Nama Merchant');
     final amount = _field(lines, wondr ? 'Total' : 'Total Bayar');
@@ -40,7 +35,7 @@ class BniParser {
       caseSensitive: false,
     ).firstMatch(amount);
     if (merchant.isEmpty || amountMatch == null) {
-      throw const FormatException(
+      throw const ReceiptLayoutException(
         'Nama merchant atau total pembayaran BNI tidak terbaca.',
       );
     }

@@ -28,7 +28,24 @@ class PaymentSourceDetector {
     return null;
   }
 
+  static bool isExactSource(String text) {
+    final normalized = TransactionClassifier.normalize(text);
+    return _aliases.any((entry) => entry.alias == normalized);
+  }
+
   static String? detect(List<String> lines) {
+    // OCR can split the BCA Syariah logo or a bank field over two rows.
+    // Preserve its field label so a receiving bank remains excluded.
+    lines = List<String>.from(lines);
+    for (var i = 0; i + 1 < lines.length; i++) {
+      if (RegExp(r'\bbca$', caseSensitive: false).hasMatch(lines[i]) &&
+          RegExp(
+            r'^syar(?:iah|nah)(?:\s+mobile)?$',
+            caseSensitive: false,
+          ).hasMatch(lines[i + 1])) {
+        lines[i] = '${lines[i]} ${lines.removeAt(i + 1)}';
+      }
+    }
     // Explicit payer fields take precedence over a receiving bank or logo.
     for (var i = 0; i < lines.length; i++) {
       if (!sourceLabel.hasMatch(lines[i])) continue;
@@ -44,6 +61,7 @@ class PaymentSourceDetector {
     }
 
     var inDestination = false;
+    String? candidate;
     for (final line in lines) {
       if (destinationLabel.hasMatch(line)) {
         inDestination = true;
@@ -55,9 +73,16 @@ class PaymentSourceDetector {
       }
       if (inDestination) continue;
       final found = match(line);
-      if (found != null) return found;
+      // A partial BCA logo can precede its complete name elsewhere on the
+      // receipt. Refine that name using only eligible source rows; explicit
+      // payer fields above still take precedence over all logos.
+      if (candidate == null ||
+          (candidate == 'BCA' &&
+              (found == 'BCA Syariah' || found == 'BCA Digital'))) {
+        candidate = found;
+      }
     }
-    return null;
+    return candidate;
   }
 
   static final _field = RegExp(

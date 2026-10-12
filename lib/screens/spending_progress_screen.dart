@@ -27,7 +27,7 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
   late Future<Uint8List> _image;
   bool _busy = false;
   bool _hideAmounts = false;
-  int _messageVariant = Random().nextInt(5);
+  late int _messageVariant;
   SpendingCardCharacter _character = SpendingCardCharacter.jajanku;
   SpendingCardColor? _cardColor;
   String? _vipUid;
@@ -40,6 +40,7 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
   @override
   void initState() {
     super.initState();
+    _messageVariant = Random().nextInt(widget.progress.messages.length);
     _image = _renderImage();
     final auth = AuthService.instance;
     if (auth.isConfigured) {
@@ -230,7 +231,9 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
                           onPressed: _busy
                               ? null
                               : () => setState(() {
-                                  _messageVariant = (_messageVariant + 1) % 5;
+                                  _messageVariant =
+                                      (_messageVariant + 1) %
+                                      widget.progress.messages.length;
                                   _image = _renderImage();
                                 }),
                           icon: const Icon(Icons.shuffle_rounded),

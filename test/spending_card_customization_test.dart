@@ -63,7 +63,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(ChoiceChip), findsNWidgets(6));
+      expect(find.byType(ChoiceChip), findsNothing);
+      for (final option in SpendingCardColor.values) {
+        expect(find.text(option.label), findsNothing);
+        expect(find.byTooltip(option.label), findsOneWidget);
+      }
       for (final option in SpendingCardCharacter.values) {
         final label = find.text(option.label);
         await tester.ensureVisible(label);
@@ -72,14 +76,14 @@ void main() {
         expect(character, option);
       }
       for (final option in SpendingCardColor.values) {
-        await tester.ensureVisible(find.text(option.label));
-        await tester.tap(find.text(option.label));
+        await tester.ensureVisible(find.byTooltip(option.label));
+        await tester.tap(find.byTooltip(option.label));
         await tester.pumpAndSettle();
         expect(color, option);
       }
       update(() => enabled = false);
       await tester.pump();
-      await tester.tap(find.text('Oranye'));
+      await tester.tap(find.byTooltip('Oranye'));
       expect(color, SpendingCardColor.green);
       expect(tester.takeException(), isNull);
     },

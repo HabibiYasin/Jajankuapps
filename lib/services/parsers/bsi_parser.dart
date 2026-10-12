@@ -1,4 +1,5 @@
 import '../../models/transaction_model.dart';
+import '../receipt_status.dart';
 
 /// Parser bukti transaksi BSI / BYOND dari teks hasil OCR.
 /// Saat ini digunakan oleh alur OCR pembayaran QRIS.
@@ -21,14 +22,7 @@ class BsiParser {
 
   /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> lines) {
-    if (RegExp(
-      r'belum\s+berhasil|tidak\s+berhasil|sedang\s+diproses|tertunda|(?:status\s*:\s*|transaksi\s+pembayaran\s+(?:qris\s+mpm\s+kamu\s+)?)(?:gagal|pending|diproses)',
-      caseSensitive: false,
-    ).hasMatch(rawText)) {
-      throw const FormatException(
-        'Pembayaran BSI belum berhasil. Gunakan bukti pembayaran berhasil.',
-      );
-    }
+    ReceiptStatus.ensureSuccessful(rawText);
     final byond = rawText.toLowerCase().contains('byond');
     final merchant = _field(lines, byond ? 'Nama Merchant' : 'Merchant');
     final amountRegex = RegExp(r'Rp\s*([0-9][0-9.,]*)', caseSensitive: false);
@@ -39,7 +33,7 @@ class BsiParser {
           _field(lines, byond ? 'Nominal Transaksi' : 'Jumlah'),
         );
     if (amountMatch == null) {
-      throw const FormatException('Total pembayaran BSI tidak terbaca.');
+      throw const ReceiptLayoutException('Total pembayaran BSI tidak terbaca.');
     }
     final number = amountMatch.group(1)!;
     final amount = double.tryParse(

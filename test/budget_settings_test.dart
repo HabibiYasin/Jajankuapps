@@ -147,6 +147,7 @@ void main() {
       BudgetLimits.snackCategories.toSet(),
     );
     final saved = await firestore.doc('users/new-user/settings/budget').get();
+    expect(saved.data()!['categories'], contains('Umum'));
     expect(
       (saved.data()!['categories'] as List).toSet(),
       BudgetLimits.snackCategories.toSet(),

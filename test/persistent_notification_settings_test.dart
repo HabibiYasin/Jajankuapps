@@ -2,20 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_application_1/screens/personalization_screen.dart';
+import 'package:flutter_application_1/screens/notification_settings_screen.dart';
 import 'package:flutter_application_1/services/budget_notification_service.dart';
 
 const channel = MethodChannel('com.jajanku.app/budget_notification');
-const settings = MaterialApp(
-  home: Scaffold(
-    body: PersonalizationScreen(
-      userName: 'Guest',
-      dailyLimit: 50000,
-      weeklyLimit: 350000,
-      monthlyLimit: 1500000,
-    ),
-  ),
-);
+const settings = MaterialApp(home: NotificationSettingsScreen());
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -2,7 +2,13 @@ import '../services/transaction_classifier.dart';
 import 'transaction_model.dart';
 
 class BudgetLimits {
-  static const snackCategories = ['Jajan', 'Makanan', 'Minuman', 'Belanja'];
+  static const snackCategories = [
+    'Jajan',
+    'Makanan',
+    'Minuman',
+    'Belanja',
+    'Umum',
+  ];
   final double daily;
   final double weekly;
   final double monthly;

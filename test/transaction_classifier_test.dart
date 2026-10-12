@@ -54,6 +54,8 @@ void main() {
       'QRIS',
       'TOP UP GOPAY',
       'GOJEK',
+      'CHICKENSON',
+      'WARUNGAN',
     ]) {
       expect(
         classify(
@@ -65,6 +67,35 @@ void main() {
       );
     }
   });
+
+  test(
+    'recognizes chicken and warung with more specific cues taking priority',
+    () {
+      final cases = {
+        'CHICKEN': 'Makanan',
+        'D BEST CHICKEN - DEPOK': 'Makanan',
+        'TEXAS CHICKEN': 'Makanan',
+        'WARUNG': 'Belanja',
+        'WARUNG BU SITI': 'Belanja',
+        'WARUNG CHICKEN': 'Makanan',
+        'WARUNG MAKAN BU SITI': 'Makanan',
+        'WARUNG NASI': 'Makanan',
+        'WARUNG KOPI': 'Minuman',
+        'WARUNG AYAM GORENG': 'Makanan',
+        'RAW CHICKEN': 'Belanja',
+        'FROZEN CHICKEN': 'Belanja',
+        'CHICKEN NUGGET': 'Jajan',
+      };
+      for (final entry in cases.entries) {
+        expect(classify(entry.key), entry.value, reason: entry.key);
+      }
+      expect(
+        classify('WARUNG BU SITI', 'Produk: token listrik'),
+        'Tagihan & Pulsa',
+      );
+      expect(classify('BUDI', 'Promo CHICKEN\nAlamat: WARUNG BU SITI'), 'Umum');
+    },
+  );
 
   test('specific phrase wins over a contained category keyword', () {
     expect(classify('PERMEN KOPI'), 'Jajan');

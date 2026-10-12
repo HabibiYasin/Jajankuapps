@@ -115,6 +115,7 @@ class SpendingCardRenderer {
       weight: FontWeight.w900,
       align: TextAlign.left,
     );
+    _drawPlayStoreLogo(canvas, const Rect.fromLTWH(773, 85, 88, 88));
     label(
       data.period,
       const Rect.fromLTWH(80, 195, 780, 115),
@@ -170,7 +171,17 @@ class SpendingCardRenderer {
       false,
     );
     canvas.drawRRect(reportShape, Paint()..color = const Color(0xFFFFFCF5));
-    const mascotBounds = Rect.fromLTWH(300, 425, 580, 455);
+    const defaultMascotBounds = Rect.fromLTWH(300, 425, 580, 455);
+    final mascotScale = character == SpendingCardCharacter.jajanku ? 1.0 : 1.25;
+    // Keep larger characters clear of the username and above the report title.
+    final mascotBounds = Rect.fromLTWH(
+      defaultMascotBounds.center.dx -
+          defaultMascotBounds.width * mascotScale / 2 +
+          (character == SpendingCardCharacter.jajanku ? 0 : 80),
+      defaultMascotBounds.bottom - defaultMascotBounds.height * mascotScale,
+      defaultMascotBounds.width * mascotScale,
+      defaultMascotBounds.height * mascotScale,
+    );
     final sourceSize = Size(mascot.width.toDouble(), mascot.height.toDouble());
     final fitted = applyBoxFit(BoxFit.contain, sourceSize, mascotBounds.size);
     canvas.drawImageRect(
@@ -260,5 +271,37 @@ class SpendingCardRenderer {
       mascot.dispose();
       picture.dispose();
     }
+  }
+
+  static void _drawPlayStoreLogo(Canvas canvas, Rect bounds) {
+    canvas.save();
+    canvas.translate(bounds.left, bounds.top);
+    canvas.scale(bounds.width / 48, bounds.height / 48);
+    void section(Color color, List<Offset> points) {
+      canvas.drawPath(Path()..addPolygon(points, true), Paint()..color = color);
+    }
+
+    section(const Color(0xFF4285F4), const [
+      Offset(6, 3),
+      Offset(27, 24),
+      Offset(6, 45),
+    ]);
+    section(const Color(0xFF34A853), const [
+      Offset(6, 3),
+      Offset(33, 18),
+      Offset(27, 24),
+    ]);
+    section(const Color(0xFFFBBC04), const [
+      Offset(33, 18),
+      Offset(44, 24),
+      Offset(33, 30),
+      Offset(27, 24),
+    ]);
+    section(const Color(0xFFEA4335), const [
+      Offset(6, 45),
+      Offset(27, 24),
+      Offset(33, 30),
+    ]);
+    canvas.restore();
   }
 }

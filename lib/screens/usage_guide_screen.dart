@@ -14,7 +14,7 @@ const List<_GuideTopic> _topics = [
         body:
             '1. Buka Personalisasi > Limit Budget.\n'
             '2. Centang kategori yang ingin kamu batasi. Minimal satu kategori harus dipilih.\n'
-            '3. Pilih Jajan aja untuk memilih Jajan, Makanan, Minuman, dan Belanja, '
+            '3. Pilih Jajan aja untuk memilih Jajan, Makanan, Minuman, Belanja, dan Umum, '
             'atau Semuanya untuk memilih seluruh kategori pengeluaran. '
             'Kamu juga bisa mengatur centangnya satu per satu.',
       ),

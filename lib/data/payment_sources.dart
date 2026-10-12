@@ -582,6 +582,10 @@ const paymentSources = <(String, List<String>)>[
     [
       "bank bca syariah",
       "bca syariah",
+      "bcasyariah",
+      // ML Kit can read the joined logo's "ri" as "rn".
+      "bcasyarnah",
+      "bca syarnah",
       "bca syariah mobile",
       "pt bank bca syariah",
     ],

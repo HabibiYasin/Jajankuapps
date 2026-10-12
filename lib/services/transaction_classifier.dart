@@ -34,6 +34,18 @@ class TransactionClassifier {
             // in the expanded workbook.
             ('a&w', 'Makanan', 2),
             ('h&m', 'Belanja', 2),
+            // Common merchant cues missing from the workbook. More specific
+            // phrases (e.g. frozen chicken / warung kopi) still take priority.
+            ('chicken', 'Makanan', 2),
+            ('warung', 'Belanja', 1),
+            ('ayam', 'Makanan', 2),
+            // Curated food merchants whose workbook entries are contextual.
+            ('kfc', 'Makanan', 2),
+            ('warung tekko', 'Makanan', 2),
+            ('warung leko', 'Makanan', 2),
+            ('ayam bang doyok', 'Makanan', 2),
+            ('daging ayam', 'Belanja', 3),
+            ('telur ayam', 'Belanja', 3),
           ]
           .map(
             (entry) => (
@@ -61,6 +73,7 @@ class TransactionClassifier {
     'steam',
   };
   static const _retailers = {
+    'warung',
     'alfamart',
     'alfamidi',
     'indomaret',
@@ -163,12 +176,24 @@ class TransactionClassifier {
     final lines = receipt.split(RegExp(r'[\r\n]+'));
     final details = <String>[];
     final label = RegExp(
-      r'^(?:keterangan|catatan|deskripsi|produk|nama produk|item|nama item|layanan)(?:\s*[:\-]\s*|\s+)(.+)$',
+      r'^(?:keterangan|catatan|deskripsi|produk|nama produk|item|nama item|layanan)(?:\s*[:\-]\s*|\s+|$)(.*)$',
       caseSensitive: false,
     );
-    for (final line in lines) {
-      final match = label.firstMatch(line.trim());
-      if (match != null) details.add(match.group(1)!);
+    for (var i = 0; i < lines.length; i++) {
+      final match = label.firstMatch(lines[i].trim());
+      if (match == null) continue;
+      final inline = match.group(1)!.trim();
+      if (inline.isNotEmpty) {
+        details.add(inline);
+      } else if (i + 1 < lines.length) {
+        final next = lines[i + 1].trim();
+        if (!RegExp(
+          r'^(?:total|nominal|jumlah|biaya|saldo|tanggal|waktu|status|metode|sumber|pengirim|penerima|merchant|nama merchant|alamat|lokasi|promo|cashback|diskon|keterangan|catatan|produk|item|layanan|no\.?|nomor|id)\b',
+          caseSensitive: false,
+        ).hasMatch(next)) {
+          details.add(next);
+        }
+      }
     }
     return details.join(' ; ');
   }

@@ -1,6 +1,8 @@
 import '../../models/transaction_model.dart';
 import '../payment_source_detector.dart';
 import '../transaction_classifier.dart';
+import '../receipt_amount.dart';
+import '../receipt_status.dart';
 
 /// Fallback for unrecognized receipts and methods without a dedicated parser.
 class GeneralParser {
@@ -8,26 +10,14 @@ class GeneralParser {
     r'\b(?:rp\.?|idr)\s*(-?\s*\d[\d.,]*)',
     caseSensitive: false,
   );
-  static final _discount = RegExp(
-    r'\b(?:diskon|discount|potongan|voucher)\b',
-    caseSensitive: false,
-  );
-  static final _finalTotal = RegExp(
-    r'\b(?:total (?:pembayaran|bayar|transaksi|akhir)|(?:jumlah|nominal) (?:dibayar|pembayaran)|(?:kamu|anda) membayar|(?:harus|yang) dibayar|setelah (?:diskon|potongan)|grand total|amount paid|total paid)\b|^total\s*:?\s*$',
-    caseSensitive: false,
-  );
-  static final _nonPurchase = RegExp(
-    r'\b(?:saldo|balance|limit|cashback|kembalian|uang tunai|uang diterima|cash received|hemat|poin)\b',
-    caseSensitive: false,
-  );
-
   static TransactionModel parse(String rawText, List<String> lines) {
+    ReceiptStatus.ensureSuccessful(rawText);
     final method = detectMethod(rawText);
     final merchant = _merchant(lines, method);
-    final amount = _amount(lines);
+    final amount = ReceiptAmount.read(lines) ?? 0;
     return TransactionModel(
       merchant: merchant,
-      nominalStr: _formatAmount(amount),
+      nominalStr: ReceiptAmount.format(amount),
       numericNominal: amount,
       source: PaymentSourceDetector.detect(lines) ?? 'Tidak Diketahui',
       paymentMethod: method,
@@ -49,19 +39,48 @@ class GeneralParser {
       r'^(?:metode|jenis|cara) (?:pembayaran|transaksi)\b|^payment method\b',
       caseSensitive: false,
     );
-    for (var i = 0; i < lines.length; i++) {
-      if (!label.hasMatch(lines[i])) continue;
+    final evidence = <String>[];
+    var inPromo = false;
+    var skipValue = false;
+    for (final line in lines) {
+      if (RegExp(
+        r'^(?:promo|cashback|diskon|nikmati|gunakan|coba)\b',
+        caseSensitive: false,
+      ).hasMatch(line)) {
+        inPromo = true;
+        continue;
+      }
+      if (label.hasMatch(line) || _metadata.hasMatch(line)) inPromo = false;
+      if (inPromo) continue;
+      if (skipValue) {
+        skipValue = false;
+        if (!label.hasMatch(line) && !_metadata.hasMatch(line)) continue;
+      }
+      if (RegExp(
+        r'^(?:merchant|nama merchant|nama toko|tujuan|penerima|keterangan|catatan|produk|item)\b',
+        caseSensitive: false,
+      ).hasMatch(line)) {
+        skipValue = RegExp(
+          r'^(?:merchant|nama merchant|nama toko|tujuan|penerima|keterangan|catatan|produk|item)\s*:?$',
+          caseSensitive: false,
+        ).hasMatch(line);
+        continue;
+      }
+      evidence.add(line);
+    }
+    for (var i = 0; i < evidence.length; i++) {
+      if (!label.hasMatch(evidence[i])) continue;
       final method =
-          _method(lines[i]) ??
-          (i + 1 < lines.length ? _method(lines[i + 1]) : null);
+          _method(evidence[i]) ??
+          (i + 1 < evidence.length ? _method(evidence[i + 1]) : null);
       if (method != null) return method;
     }
     // Promotions and item/merchant names must not select a payment method.
     return _method(
-          lines
+          evidence
               .where(
-                (line) => !RegExp(
-                  r'^(?:promo|cashback|diskon|nikmati|gunakan|coba|merchant|nama merchant|keterangan|catatan|produk|item)\b',
+                (line) => RegExp(
+                  r'^(?:pembayaran|transaksi|transfer|trf|tf|bi[ -]?fast|rtgs|skn|kirim uang|kirim ke|qris|qr|virtual account|va|s?pay\s*later|gopay\s*later|shopee\s*pay\s*later|kredivo|akulaku|tunai|cash|ovo cash|otto cash)\b',
                   caseSensitive: false,
                 ).hasMatch(line),
               )
@@ -108,99 +127,16 @@ class GeneralParser {
     return null;
   }
 
-  static double _number(String text) {
-    var value = text
-        .replaceAll(RegExp(r'[^\d.,]'), '')
-        .replaceAll(RegExp(r'[.,]+$'), '');
-    final decimal = RegExp(r'[.,](\d{1,2})$').firstMatch(value);
-    if (decimal != null) {
-      value =
-          '${value.substring(0, decimal.start).replaceAll(RegExp(r'[.,]'), '')}.${decimal.group(1)}';
-    } else {
-      value = value.replaceAll(RegExp(r'[.,]'), '');
-    }
-    return double.tryParse(value) ?? 0;
-  }
-
-  static double _amount(List<String> lines) {
-    final values = <({double value, String context})>[];
-    for (var i = 0; i < lines.length; i++) {
-      final matches = _money.allMatches(lines[i]).toList();
-      var end = 0;
-      for (final match in matches) {
-        var context = lines[i].substring(end, match.start).trim();
-        if (context.isEmpty && i > 0 && !_money.hasMatch(lines[i - 1])) {
-          context = lines[i - 1];
-        }
-        values.add((value: _number(match.group(1)!), context: context));
-        end = match.end;
-      }
-      // Some OCR engines put "Rp" on a line by itself.
-      if (RegExp(r'^(?:rp\.?|idr)$', caseSensitive: false).hasMatch(lines[i]) &&
-          i + 1 < lines.length &&
-          RegExp(r'^\d[\d.,]*$').hasMatch(lines[i + 1])) {
-        values.add((
-          value: _number(lines[i + 1]),
-          context: i > 0 ? lines[i - 1] : '',
-        ));
-      }
-    }
-    final purchases = values
-        .where(
-          (v) =>
-              !_nonPurchase.hasMatch(v.context) &&
-              !_discount.hasMatch(v.context),
-        )
-        .toList();
-    final finals = values
-        .where(
-          (v) =>
-              !_nonPurchase.hasMatch(v.context) &&
-              _finalTotal.hasMatch(v.context),
-        )
-        .toList();
-    final hasDiscount = lines.any(_discount.hasMatch);
-    // Never subtract a discount twice when a net total is printed.
-    if (hasDiscount && finals.isNotEmpty) return finals.last.value;
-    if (purchases.isEmpty) return 0;
-    final largest = purchases
-        .map((v) => v.value)
-        .reduce((a, b) => a > b ? a : b);
-    if (!hasDiscount) return largest;
-    final discounts = values.where(
-      (v) =>
-          _discount.hasMatch(v.context) &&
-          !_finalTotal.hasMatch(v.context) &&
-          !_nonPurchase.hasMatch(v.context),
-    );
-    final deduction = discounts.fold<double>(0, (sum, v) => sum + v.value);
-    if (deduction > 0 && deduction <= largest) {
-      return double.parse((largest - deduction).toStringAsFixed(2));
-    }
-    // Percentage-only discounts cannot be applied safely without a printed
-    // deduction (caps and eligibility may be missing from the receipt).
-    return largest;
-  }
-
-  static String _formatAmount(double value) {
-    final parts = value.toStringAsFixed(2).split('.');
-    final whole = parts[0].replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (_) => '.',
-    );
-    return 'Rp$whole${parts[1] == '00' ? '' : ',${parts[1]}'}';
-  }
-
   static final _metadata = RegExp(
     r'^(?:total|subtotal|nominal|jumlah|biaya|saldo|diskon|potongan|promo|cashback|tanggal|waktu|pukul|jam|metode|jenis transaksi|status|transaksi|pembayaran|transfer berhasil|berhasil|sukses|rincian|detail|no\.?|nomor|id|kode|ref|referensi|rrn|pan|mpan|cpan|terminal|merchant (?:pan|id)|nama (?:acquirer|issuer)|lokasi|alamat|keterangan|catatan|produk|item|pengirim|nama pengirim|dari|sumber|rekening asal|bank asal|terima kasih|bagikan|unduh|tutup)\b',
     caseSensitive: false,
   );
-  static bool _isName(String text) =>
+  static bool isMerchantName(String text) =>
       text.length > 2 &&
       RegExp(r'[a-zA-Z]').hasMatch(text) &&
       !_metadata.hasMatch(text) &&
       !_money.hasMatch(text) &&
-      PaymentSourceDetector.match(text) == null &&
+      !PaymentSourceDetector.isExactSource(text) &&
       !RegExp(
         r'^(?:nama|merchant|nama merchant|qris|virtual account|va|paylater|pay later|transfer|tunai|cash)$',
         caseSensitive: false,
@@ -221,12 +157,18 @@ class GeneralParser {
     for (final label in labels) {
       for (var i = 0; i < lines.length; i++) {
         final match = label.firstMatch(lines[i]);
-        if (match == null || _metadata.hasMatch(lines[i])) continue;
+        if (match == null ||
+            RegExp(
+              r'^merchant (?:pan|id)\b',
+              caseSensitive: false,
+            ).hasMatch(lines[i])) {
+          continue;
+        }
         final inline = match.group(1)!.trim();
-        if (_isName(inline)) return inline;
+        if (isMerchantName(inline)) return inline;
         for (var j = i + 1; j < lines.length && j <= i + 4; j++) {
           if (_metadata.hasMatch(lines[j])) break;
-          if (_isName(lines[j]) &&
+          if (isMerchantName(lines[j]) &&
               !labels.any((l) => l.hasMatch(lines[j])) &&
               !RegExp(r'^bank\b', caseSensitive: false).hasMatch(lines[j])) {
             return lines[j];
@@ -240,13 +182,13 @@ class GeneralParser {
         r'^(.+?)\s+(?:nama merchant|merchant)\s*:?$',
         caseSensitive: false,
       ).firstMatch(line);
-      if (match != null && _isName(match.group(1)!)) {
+      if (match != null && isMerchantName(match.group(1)!)) {
         return match.group(1)!.trim();
       }
     }
     // Reuse the existing 7,000-keyword classifier, including its ambiguity rules.
     for (var i = 0; i < lines.length; i++) {
-      if (!_isName(lines[i])) continue;
+      if (!isMerchantName(lines[i])) continue;
       if (i > 0 &&
           RegExp(
             r'^(?:pengirim|nama pengirim|dari|keterangan|catatan|produk|item|alamat)\s*:?$',

@@ -1,6 +1,8 @@
 import '../models/transaction_model.dart';
 import 'transaction_classifier.dart';
 import 'payment_source_detector.dart';
+import 'receipt_amount.dart';
+import 'receipt_status.dart';
 import 'parsers/general_parser.dart';
 import 'parsers/shopeepay_parser.dart';
 import 'parsers/dana_parser.dart';
@@ -25,6 +27,7 @@ class QrisParser {
   }
 
   static TransactionModel _parseReceipt(String rawText) {
+    ReceiptStatus.ensureSuccessful(rawText);
     List<String> lines = rawText.split('\n');
     List<String> cleanedLines = lines
         .map((l) => l.trim())
@@ -36,24 +39,41 @@ class QrisParser {
     // Dedicated parsers currently understand QRIS layouts only.
     if (method != 'QRIS') return GeneralParser.parse(rawText, cleanedLines);
     // A bank mentioned only as recipient/acquirer must not select its parser.
-    // Retain the established Jago layout signature for OCR-damaged logos.
+    // Jago has a distinctive signature; the generic BCA Syariah labels alone
+    // cannot establish which bank issued a receipt.
     bool accepts(String name) =>
         source == name || (source == null && name == 'Bank Jago');
 
-    final transaction = _parseSpecialized(rawText, cleanedLines, accepts);
+    TransactionModel? transaction;
+    try {
+      transaction = _parseSpecialized(rawText, cleanedLines, accepts);
+    } on ReceiptLayoutException {
+      final fallback = GeneralParser.parse(rawText, cleanedLines);
+      if (fallback.numericNominal <= 0) rethrow;
+      return fallback;
+    }
     if (transaction == null) return GeneralParser.parse(rawText, cleanedLines);
+
+    // All layouts share monetary normalization and final-total precedence.
+    final amount = ReceiptAmount.read(cleanedLines);
+    if (amount != null && amount != transaction.numericNominal) {
+      transaction.numericNominal = amount;
+      transaction.nominalStr = ReceiptAmount.format(amount);
+    }
 
     // Keep a recognized layout's valid fields, filling missing data via fallback.
     if (transaction.numericNominal <= 0 ||
         transaction.merchant == 'Tidak Diketahui' ||
-        transaction.merchant == 'Merchant Umum') {
+        transaction.merchant == 'Merchant Umum' ||
+        !GeneralParser.isMerchantName(transaction.merchant)) {
       final fallback = GeneralParser.parse(rawText, cleanedLines);
       if (transaction.numericNominal <= 0) {
         transaction.numericNominal = fallback.numericNominal;
         transaction.nominalStr = fallback.nominalStr;
       }
       if (transaction.merchant == 'Tidak Diketahui' ||
-          transaction.merchant == 'Merchant Umum') {
+          transaction.merchant == 'Merchant Umum' ||
+          !GeneralParser.isMerchantName(transaction.merchant)) {
         transaction.merchant = fallback.merchant;
       }
     }
@@ -81,8 +101,7 @@ class QrisParser {
       return BsiParser.parse(rawText, cleanedLines);
     } else if (accepts('DANA') && DanaParser.isMatch(rawText)) {
       return DanaParser.parse(rawText, cleanedLines);
-    } else if (accepts('BCA Syariah') &&
-        rawText.toLowerCase().contains('bca syariah')) {
+    } else if (accepts('BCA Syariah') && BcaSyariahParser.isMatch(rawText)) {
       return BcaSyariahParser.parse(rawText, cleanedLines);
     } else if (accepts('BCA') && BcaParser.isMatch(rawText)) {
       return BcaParser.parse(rawText, cleanedLines);

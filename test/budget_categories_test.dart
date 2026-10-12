@@ -36,6 +36,7 @@ void main() {
       expense('Makanan', 20000, date),
       expense('Minuman', 5000, date),
       expense('Belanja', 15000, date),
+      expense('Umum', 6000, date),
       expense('Tagihan & Pulsa', 100000, date),
       expense('Transportasi', 30000, DateTime(2026, 10, 5)),
       expense('Tagihan & Pulsa', 70000, DateTime(2026, 9, 6)),
@@ -53,25 +54,26 @@ void main() {
       date,
       monthly: true,
     );
-    expect(daily.tracked, 50000);
+    expect(daily.tracked, 56000);
     expect(daily.other, 100000);
-    expect(monthly.tracked, 50000);
+    expect(monthly.tracked, 56000);
     expect(monthly.other, 130000);
-    expect(history, hasLength(8));
+    expect(history, hasLength(9));
     expect(BudgetNotificationService.dailyTotals(limits.tracked(history)), {
-      '2026-10-06': 50000,
+      '2026-10-06': 56000,
+      '2025-10-06': 90000,
     });
     final all = BudgetTotals.forPeriod(
       history,
       TransactionClassifier.categories,
       date,
     );
-    expect(all.tracked, 150000);
+    expect(all.tracked, 156000);
     expect(all.other, 0);
     history.first.category = 'Tagihan & Pulsa';
     expect(
       BudgetTotals.forPeriod(history, limits.trackedCategories, date).tracked,
-      40000,
+      46000,
     );
   });
 

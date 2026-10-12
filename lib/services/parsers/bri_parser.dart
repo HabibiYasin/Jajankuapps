@@ -1,4 +1,5 @@
 import '../../models/transaction_model.dart';
+import '../receipt_amount.dart';
 
 /// Parser bukti transaksi BRI / BRImo dari teks hasil OCR.
 /// Saat ini digunakan oleh alur OCR pembayaran QRIS.
@@ -8,48 +9,28 @@ class BriParser {
   // === OCR: deteksi format bukti transaksi saat ini ===
   static bool isMatch(String rawText) {
     String lower = rawText.toLowerCase();
-    return lower.contains("pt. bank rakyat indonesia") || 
-           lower.contains("brimo") || 
-           lower.contains("kantor pusat bri") || 
-           (lower.contains("sumber dana") && lower.contains("bri"));
+    return lower.contains("pt. bank rakyat indonesia") ||
+        lower.contains("brimo") ||
+        lower.contains("kantor pusat bri") ||
+        (lower.contains("sumber dana") && lower.contains("bri"));
   }
 
   /// Mengubah teks hasil OCR menjadi transaksi pada alur QRIS saat ini.
   static TransactionModel parse(String rawText, List<String> cleanedLines) {
     String merchantName = "Tidak Diketahui";
-    String nominalStr = "Rp0";
-    double numericVal = 0;
-
-    // 1. AMBIL NOMINAL DARI "Rp" PALING ATAS
-    for (String line in cleanedLines) {
-      if (line.contains("Rp") || line.contains("rp")) {
-        final match = RegExp(r'Rp[0-9.]+').firstMatch(line);
-        if (match != null) {
-          nominalStr = match.group(0)!;
-          break; // Ambil yang paling atas/pertama ketemu
-        }
-      }
-    }
-
-    String cleanNum = nominalStr.replaceAll(RegExp(r'[^0-9]'), '');
-    numericVal = double.tryParse(cleanNum) ?? 0;
+    final numericVal = ReceiptAmount.read(cleanedLines) ?? 0;
+    final nominalStr = ReceiptAmount.format(numericVal);
 
     // 2. AMBIL FIELD "NAMA MERCHANT". Nilainya bisa berada pada baris yang
     // sama dan berlanjut ke baris berikutnya, misalnya:
     // Nama Merchant MbI365739 Konter
     // Ryan Nug
     // Lokasi Merchant KUNINGAN
-    merchantName = _valueWithContinuation(
-      cleanedLines,
-      label: 'nama merchant',
-    );
+    merchantName = _valueWithContinuation(cleanedLines, label: 'nama merchant');
 
     // Pada ringkasan bagian atas, merchant juga ditampilkan setelah "Tujuan".
     if (merchantName == "Tidak Diketahui") {
-      merchantName = _valueWithContinuation(
-        cleanedLines,
-        label: 'tujuan',
-      );
+      merchantName = _valueWithContinuation(cleanedLines, label: 'tujuan');
     }
 
     // Fallback cadangan untuk variasi struk lama.
@@ -66,7 +47,10 @@ class BriParser {
     // 3. KATEGORI OTOMATIS
     String category = "Tagihan & Pulsa";
     String lowerMerchant = merchantName.toLowerCase();
-    if (lowerMerchant.contains("konter") || lowerMerchant.contains("pulsa") || lowerMerchant.contains("token") || lowerMerchant.contains("pdam")) {
+    if (lowerMerchant.contains("konter") ||
+        lowerMerchant.contains("pulsa") ||
+        lowerMerchant.contains("token") ||
+        lowerMerchant.contains("pdam")) {
       category = "Tagihan & Pulsa";
     } else {
       category = "Belanja";
@@ -78,7 +62,7 @@ class BriParser {
       dateTime: DateTime.now(),
       category: category,
       numericNominal: numericVal,
-      source: "BRImo", 
+      source: "BRImo",
     );
   }
 
