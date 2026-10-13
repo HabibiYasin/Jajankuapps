@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/auth_service.dart';
 import '../services/account_data_service.dart';
+import '../services/premium_billing_service.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   final User user;
@@ -70,6 +71,18 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             'Akun, profil, transaksi, pengaturan budget, riwayat import, dan catatan instalasi di cloud akan dihapus permanen. Data Guest di HP ini tetap ada. Penghapusan memerlukan internet.',
           ),
           const SizedBox(height: 20),
+          const Text(
+            'Menghapus akun tidak membatalkan langganan Google Play. '
+            'Batalkan dahulu melalui Google Play > Pembayaran & langganan > '
+            'Langganan agar tidak ada tagihan berikutnya. Catatan verifikasi '
+            'pembayaran disimpan terpisah untuk penanganan transaksi.',
+          ),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : PremiumBillingService.instance.manageSubscription,
+            child: const Text('Kelola langganan di Google Play'),
+          ),
           if (_google)
             const Text('Verifikasi akun Google yang sama sebelum menghapus.')
           else

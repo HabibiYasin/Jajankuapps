@@ -17,6 +17,7 @@ import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'notification_settings_screen.dart';
+import 'upgrade_account_screen.dart';
 
 enum UserTier {
   guest('Jajaners CobaCoba'),
@@ -523,6 +524,18 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           const SizedBox(height: 24),
           Text('Personalisasi', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
+          _menuTile(
+            icon: Icons.workspace_premium_outlined,
+            title: 'Upgrade Akun',
+            subtitle:
+                'Status premium, pilihan paket, dan langganan Google Play',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const UpgradeAccountScreen(),
+              ),
+            ),
+          ),
           _menuTile(
             icon: Icons.account_balance_wallet_outlined,
             title: 'Limit Budget',

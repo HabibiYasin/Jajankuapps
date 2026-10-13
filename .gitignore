@@ -46,3 +46,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Cloud Functions dependencies and local credentials
+functions/node_modules/
+functions/.env*
+!functions/.env.example

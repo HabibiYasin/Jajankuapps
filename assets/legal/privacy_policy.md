@@ -1,6 +1,6 @@
 # Kebijakan Privasi Jajanku
 
-**Terakhir diperbarui: 7 Oktober 2026**
+**Terakhir diperbarui: 13 Oktober 2026**
 
 Kebijakan Privasi ini menjelaskan bagaimana **Jajanku**, yang dikembangkan dan dikelola oleh **Spizartel**, mengumpulkan, menggunakan, menyimpan, dan melindungi informasi pengguna saat menggunakan aplikasi Jajanku.
 
@@ -193,6 +193,21 @@ Penghapusan akun cloud tidak secara otomatis menghapus:
 Data lokal Jajanku dapat dihapus melalui fitur aplikasi yang tersedia, pengaturan penyimpanan aplikasi Android, atau dengan menghapus aplikasi dari perangkat.
 
 Log teknis, diagnostik, atau cadangan yang dikelola oleh penyedia layanan pihak ketiga dapat memiliki periode penyimpanan tersendiri sesuai kebijakan penyedia layanan tersebut.
+
+## Pembayaran Premium
+
+Pembayaran dan perpanjangan langganan premium diproses melalui Google Play.
+Jajanku menyimpan identitas akun yang disamarkan untuk Google Play, token dan
+identitas transaksi, paket yang dibeli, status pembayaran, tanggal mulai dan
+akhir premium, serta riwayat pernah premium untuk memverifikasi pembelian,
+memulihkan akses, dan menentukan kelayakan diskon pertama. Jajanku tidak menerima
+nomor kartu atau kredensial metode pembayaran dari Google Play.
+
+Catatan verifikasi pembayaran disimpan terpisah dari profil dan tidak otomatis
+dihapus bersama akun, untuk penanganan transaksi dan pencegahan penggunaan ulang
+bukti pembayaran. Permintaan terkait data pembayaran dapat disampaikan melalui
+kontak privasi di bawah. Menghapus akun Jajanku tidak membatalkan langganan;
+batalkan melalui Google Play agar tidak ada tagihan berikutnya.
 
 ## Pilihan dan Kontrol Pengguna
 

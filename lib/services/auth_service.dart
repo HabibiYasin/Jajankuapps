@@ -63,6 +63,10 @@ class AuthService {
         'lastLoginAt': FieldValue.serverTimestamp(),
         if (!snapshot.exists) 'createdAt': FieldValue.serverTimestamp(),
         if (!snapshot.exists) 'plan': 'free',
+        if (!snapshot.exists) 'PremiumStartedAt': null,
+        if (!snapshot.exists) 'PremiumEndedAt': null,
+        if (!snapshot.exists) 'hasEverBeenPremium': false,
+        if (!snapshot.exists) 'premiumLifetime': false,
       }, SetOptions(merge: true));
     });
     await AppActivityService.recordInstallation(

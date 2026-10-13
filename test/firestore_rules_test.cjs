@@ -35,13 +35,13 @@ async function query(uid, owner, expected) {
   assert.equal(result.status, expected, await result.text()); checks++;
 }
 (async () => {
-  async function profileWrite(uid, plan, create = false) {
+  async function profileWrite(uid, plan, create = false, extra = {}) {
     const result = await fetch(`${base}:commit`, {
       method: 'POST', headers: {'Content-Type':'application/json', Authorization:`Bearer ${token(uid)}`},
       body: JSON.stringify({writes: [{
         update: {name: `projects/demo-jajanku/databases/(default)/documents/users/${uid}`,
           fields: {email:{stringValue:'test@example.com'},displayName:{stringValue:''},
-            providers:{arrayValue:{values:[{stringValue:'password'}]}},plan:{stringValue:plan}}},
+            providers:{arrayValue:{values:[{stringValue:'password'}]}},plan:{stringValue:plan}, ...extra}},
         updateTransforms: [ ...(create ? [{fieldPath:'createdAt',setToServerValue:'REQUEST_TIME'}] : []),
           {fieldPath:'lastLoginAt',setToServerValue:'REQUEST_TIME'}],
         ...(create ? {} : {updateMask:{fieldPaths:['email','displayName','providers','plan']}}),
@@ -56,6 +56,25 @@ async function query(uid, owner, expected) {
   await request('GET','users/profile-user','bob',undefined,403);
   assert.equal(await profileWrite('profile-user','vip'),403);
   assert.equal(await profileWrite('profile-user','free'),200);
+  assert.equal(await profileWrite('lifetime-user','free',true,{premiumLifetime:{booleanValue:true}}),403);
+  assert.equal(await profileWrite('lifetime-user','free',true,{premiumLifetime:{stringValue:'true'}}),403);
+  assert.equal(await profileWrite('lifetime-user','free',true,{premiumLifetime:{booleanValue:false}}),200);
+  await request('PATCH', 'users/lifetime-user?updateMask.fieldPaths=premiumLifetime', 'lifetime-user', {premiumLifetime:{booleanValue:true}}, 403);
+  for (const [field, value] of Object.entries({
+    PremiumStartedAt: {timestampValue: '2026-10-01T00:00:00Z'},
+    PremiumEndedAt: {timestampValue: '2027-10-01T00:00:00Z'},
+    hasEverBeenPremium: {booleanValue: true},
+    premiumLifetime: {booleanValue: true},
+    premiumAutoRenewing: {booleanValue: true},
+    premiumSubscriptionState: {stringValue: 'SUBSCRIPTION_STATE_ACTIVE'},
+  })) {
+    await request('PATCH', `users/profile-user?updateMask.fieldPaths=${field}`, 'profile-user', {[field]: value}, 403);
+  }
+  for (const collection of ['billingAccounts', 'playPurchases']) {
+    await request('GET', `${collection}/secret`, 'profile-user', undefined, 403);
+    await request('PATCH', `${collection}/secret`, 'profile-user', {hasEverBeenPremium: {booleanValue: false}}, 403);
+    await request('DELETE', `${collection}/secret`, 'profile-user', undefined, 403);
+  }
   const avatarPath = 'users/profile-user?updateMask.fieldPaths=avatarCode';
   for (let code = 1; code <= 6; code++) {
     await request('PATCH', avatarPath, 'profile-user', {avatarCode:{integerValue:String(code)}});

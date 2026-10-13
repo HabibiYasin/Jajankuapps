@@ -13,6 +13,7 @@ import 'models/budget_totals.dart';
 import 'services/ocr_service.dart';
 import 'services/account_data_service.dart';
 import 'services/profile_plan_store.dart';
+import 'services/premium_billing_service.dart';
 import 'services/auth_service.dart';
 import 'services/app_activity_service.dart';
 
@@ -158,6 +159,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    PremiumBillingService.instance.start();
     _accountData.addListener(_applyAccountData);
     _accountData.start();
     _applyAccountData();

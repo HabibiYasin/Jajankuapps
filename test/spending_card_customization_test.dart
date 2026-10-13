@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,13 +22,21 @@ void main() {
     final states = <bool>[];
     final subscription = store.watchVip('vip-user').listen(states.add);
     await pumpEventQueue();
-    await profile.update({'plan': 'premium'});
+    await profile.update({
+      'plan': 'premium',
+      'PremiumStartedAt': Timestamp.fromDate(
+        DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      'PremiumEndedAt': Timestamp.fromDate(
+        DateTime.now().add(const Duration(days: 1)),
+      ),
+    });
     await pumpEventQueue();
     await profile.update({'plan': 'free'});
     await pumpEventQueue();
     await profile.update({'plan': 'unknown'});
     await pumpEventQueue();
-    expect(states, [false, true, false, false]);
+    expect(states, [false, true, false]);
     await subscription.cancel();
   });
 

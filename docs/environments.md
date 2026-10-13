@@ -123,6 +123,10 @@ Unduh ulang JSON prod bila diperlukan dan uji melalui internal testing Play.
 
 ## Pemeriksaan sebelum rilis
 
+Konfigurasi paket premium, diskon pertama, service account, dan notifikasi Google
+Play dijelaskan di [premium-google-play.md](premium-google-play.md). Billing dev
+memakai `com.jajanku.app.dev`; billing prod memakai `com.jajanku.app`.
+
 - Pastikan rules prod sudah dipublish; keberadaan file lokal tidak berarti
   rules produksi sudah terpasang.
 - Deploy selalu dengan `--project` eksplisit agar tujuan jelas.
