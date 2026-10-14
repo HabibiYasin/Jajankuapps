@@ -25,6 +25,21 @@ class AuthService {
       user.providerData.any((p) => p.providerId == 'password') &&
       !user.providerData.any((p) => p.providerId == 'google.com');
 
+  static String resolveProfileName({
+    String? savedName,
+    String? googleName,
+    String? email,
+  }) {
+    if (savedName != null && savedName.trim().isNotEmpty) {
+      return savedName.trim();
+    }
+    if (googleName != null && googleName.trim().isNotEmpty) {
+      return googleName.trim();
+    }
+    final emailName = (email ?? '').trim().split('@').first;
+    return emailName.isEmpty ? 'Jajaners' : emailName;
+  }
+
   Future<UserCredential> signInWithGoogle() async {
     if (!isConfigured) {
       throw StateError(
@@ -48,14 +63,23 @@ class AuthService {
   Future<void> syncProfile(User user) async {
     if (needsEmailVerification(user)) return;
     final ref = FirebaseFirestore.instance.collection('users').doc(user.uid);
-    String? savedName;
+    String? profileName;
     await FirebaseFirestore.instance.runTransaction((transaction) async {
       final snapshot = await transaction.get(ref);
-      savedName = snapshot.data()?['displayName'] as String?;
+      final googleProviders = user.providerData.where(
+        (provider) => provider.providerId == 'google.com',
+      );
+      profileName = resolveProfileName(
+        savedName: snapshot.data()?['displayName'] as String?,
+        googleName: googleProviders.isEmpty
+            ? null
+            : googleProviders.first.displayName ?? user.displayName,
+        email: user.email,
+      );
       transaction.set(ref, {
         ...await AppActivityService.profileFields(snapshot.data()),
         'email': user.email ?? '',
-        'displayName': savedName ?? user.displayName ?? '',
+        'displayName': profileName,
         'avatarCode': ProfileAvatarStore.normalize(
           snapshot.data()?['avatarCode'],
         ),
@@ -73,10 +97,10 @@ class AuthService {
       FirebaseFirestore.instance,
       user.uid,
     );
-    if (savedName != null &&
-        user.displayName != savedName &&
+    if (profileName != null &&
+        user.displayName != profileName &&
         currentUser?.uid == user.uid) {
-      await user.updateDisplayName(savedName);
+      await user.updateDisplayName(profileName);
     }
   }
 

@@ -39,9 +39,7 @@ void main() {
     await tester.pumpWidget(profileApp());
     await tester.pumpAndSettle();
     Future<void> openPicker() async {
-      await tester.tap(find.byTooltip('Pengaturan akun'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Ganti foto profil'));
+      await tester.tap(find.byTooltip('Ganti foto profil'));
       await tester.pumpAndSettle();
     }
 

@@ -455,9 +455,19 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
         ),
         leading: Semantics(
           label: 'Foto profil ${ProfileAvatarStore.labels[_avatarCode - 1]}',
-          child: CircleAvatar(
-            radius: 30,
-            backgroundImage: AssetImage(ProfileAvatarStore.asset(_avatarCode)),
+          button: true,
+          child: Tooltip(
+            message: 'Ganti foto profil',
+            child: InkWell(
+              onTap: _loading ? null : () => _editAvatar(user),
+              customBorder: const CircleBorder(),
+              child: CircleAvatar(
+                radius: 30,
+                backgroundImage: AssetImage(
+                  ProfileAvatarStore.asset(_avatarCode),
+                ),
+              ),
+            ),
           ),
         ),
         title: Text(
