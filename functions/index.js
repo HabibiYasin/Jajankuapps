@@ -38,8 +38,16 @@ function requireUser(request) {
   return request.auth.uid;
 }
 
+async function subscriptionCatalog() {
+  const snapshot = await db.collection('subscriptions').get();
+  return snapshot.docs.map(doc => ({...doc.data(), id: doc.id}))
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+}
+
 exports.preparePremiumPurchase = onCall({region}, async request => {
   const uid = requireUser(request);
+  const plans = (await subscriptionCatalog()).filter(plan => plan.enabled === true);
+  if (!plans.length) throw new HttpsError('failed-precondition', 'Paket langganan belum dikonfigurasi. Hubungi admin.');
   return db.runTransaction(async tx => {
     const profileRef = db.collection('users').doc(uid);
     const [profile, history] = await Promise.all([tx.get(profileRef), tx.get(accountRef(uid))]);
@@ -49,12 +57,15 @@ exports.preparePremiumPurchase = onCall({region}, async request => {
     if (ever && profile.data().hasEverBeenPremium !== true) {
       tx.update(profileRef, {hasEverBeenPremium: true});
     }
-    return {eligibleForIntro: !ever, obfuscatedAccountId: accountId(uid)};
+    return {eligibleForIntro: !ever, obfuscatedAccountId: accountId(uid), plans};
   });
 });
 
 async function synchronize(token, uid) {
   const ref = purchaseRef(token);
+  // Disabled plans still verify renewals and existing paid subscriptions.
+  const catalog = await subscriptionCatalog();
+  const plans = Object.fromEntries(catalog.map(plan => [plan.id, plan.offerId || null]));
   const verified = await db.runTransaction(async tx => {
     const [previous, profile, history, all] = await Promise.all([
       tx.get(ref), tx.get(db.collection('users').doc(uid)), tx.get(accountRef(uid)),
@@ -65,7 +76,7 @@ async function synchronize(token, uid) {
     try { assertOwner(purchase, accountId(uid), previous.data()?.uid, uid); }
     catch { throw new HttpsError('permission-denied', 'Pembelian ini milik akun Jajanku lain.'); }
     let parsed;
-    try { parsed = readSubscription(purchase); }
+    try { parsed = readSubscription(purchase, Date.now(), plans); }
     catch { throw new HttpsError('invalid-argument', 'Produk atau masa langganan tidak dikenali.'); }
     const ever = everPremium(profile.data()) || history.data()?.hasEverBeenPremium === true;
     // Only the first successfully granted token can use an introductory offer.

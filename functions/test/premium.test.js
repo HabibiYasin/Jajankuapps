@@ -88,3 +88,12 @@ test('old expired or replaced tokens cannot remove a newer active entitlement', 
   ], now), valid);
   assert.equal(chooseEntitlement([valid], now + 1000), null);
 });
+
+
+test('catalog accepts a new base plan without changing verification code', () => {
+  const p = purchase();
+  p.lineItems[0].offerDetails = {basePlanId: 'annual', offerId: 'annual-intro'};
+  assert.equal(readSubscription(p, now, {annual: 'annual-intro'}).active, true);
+  assert.throws(() => readSubscription(p, now, {}));
+  assert.throws(() => readSubscription(p, now, {annual: null}));
+});

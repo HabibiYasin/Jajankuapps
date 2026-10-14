@@ -89,7 +89,10 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
     super.dispose();
   }
 
-  Widget _plan(String id, String duration, String normalPrice) {
+  Widget _plan(SubscriptionPlan plan) {
+    final id = plan.id;
+    final duration = plan.title;
+    const normalPrice = 'Harga tersedia setelah terhubung ke Google Play';
     final offer = _billing.offers[id];
     final discount =
         offer?.discounted == true && _status?.hasEverBeenPremium == false;
@@ -105,7 +108,8 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            if (discount) const Text('Diskon 50% untuk pembelian pertama'),
+            if (discount)
+              Text('Diskon ${plan.discountPercent}% untuk pembelian pertama'),
             Text(
               offer?.price ?? normalPrice,
               style: Theme.of(context).textTheme.headlineSmall,
@@ -194,14 +198,13 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
                 const SizedBox(height: 12),
                 if (_status?.hasEverBeenPremium == false)
                   const Text(
-                    'Diskon 50% untuk periode pertama tersedia bagi akun yang belum pernah VIP/premium, sesuai kelayakan Google Play.',
+                    'Penawaran periode pertama tersedia bagi akun yang belum pernah VIP/premium, sesuai kelayakan Google Play.',
                   ),
                 if (_status?.hasEverBeenPremium == true)
                   const Text(
                     'Akun ini sudah pernah premium. Paket berikut menggunakan harga normal.',
                   ),
-                _plan('monthly', '1 bulan', 'Rp20.000'),
-                _plan('six-monthly', '6 bulan', 'Rp100.000'),
+                ..._billing.plans.map(_plan),
                 const Text(
                   'Langganan diperpanjang otomatis dengan harga normal sampai dibatalkan. Batalkan kapan saja melalui Google Play; akses tetap tersedia hingga periode aktif berakhir. Harga final ditampilkan pada pembayaran Google Play.',
                 ),

@@ -95,6 +95,33 @@ void main() {
       isEmpty,
     );
   });
+  test('remote catalog controls visibility and discount percentage', () {
+    final configured = [
+      const SubscriptionPlan(
+        id: 'monthly',
+        title: 'Bulanan',
+        billingPeriod: 'P1M',
+        offerId: 'first-month-half',
+        discountPercent: 25,
+      ),
+    ];
+    final offers = PremiumBillingService.selectOffers(
+      products(discountPrice: 15000),
+      eligibleForIntro: true,
+      plans: configured,
+    );
+    expect(offers.keys, ['monthly']);
+    expect(offers['monthly']!.price, 'Rp15000');
+    expect(offers['monthly']!.discounted, isTrue);
+    expect(
+      PremiumBillingService.selectOffers(
+        products(),
+        eligibleForIntro: true,
+        plans: [],
+      ),
+      isEmpty,
+    );
+  });
   testWidgets('Personalisasi opens Upgrade Akun and Guest must sign in', (
     tester,
   ) async {

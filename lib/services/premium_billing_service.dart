@@ -10,6 +10,29 @@ import 'package:url_launcher/url_launcher.dart';
 import '../config/app_environment.dart';
 import 'auth_service.dart';
 
+class SubscriptionPlan {
+  const SubscriptionPlan({
+    required this.id,
+    required this.title,
+    required this.billingPeriod,
+    this.offerId,
+    this.discountPercent = 0,
+  });
+  final String id;
+  final String title;
+  final String billingPeriod;
+  final String? offerId;
+  final int discountPercent;
+  factory SubscriptionPlan.fromMap(Map<dynamic, dynamic> data) =>
+      SubscriptionPlan(
+        id: data['id'] as String,
+        title: data['title'] as String,
+        billingPeriod: data['billingPeriod'] as String,
+        offerId: data['offerId'] as String?,
+        discountPercent: (data['discountPercent'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class PremiumOffer {
   const PremiumOffer(this.product, this.details);
   final GooglePlayProductDetails product;
@@ -23,10 +46,23 @@ class PremiumBillingService extends ChangeNotifier {
   PremiumBillingService._();
   static final instance = PremiumBillingService._();
   static const productId = 'jajanku_premium';
-  static const planOffers = {
-    'monthly': 'first-month-half',
-    'six-monthly': 'first-six-months-half',
-  };
+  static const defaultPlans = [
+    SubscriptionPlan(
+      id: 'monthly',
+      title: '1 bulan',
+      billingPeriod: 'P1M',
+      offerId: 'first-month-half',
+      discountPercent: 50,
+    ),
+    SubscriptionPlan(
+      id: 'six-monthly',
+      title: '6 bulan',
+      billingPeriod: 'P6M',
+      offerId: 'first-six-months-half',
+      discountPercent: 50,
+    ),
+  ];
+  List<SubscriptionPlan> plans = [];
 
   bool get supported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -64,6 +100,7 @@ class PremiumBillingService extends ChangeNotifier {
       _owner = uid;
       ++_generation;
       offers = {};
+      plans = [];
       _obfuscatedAccountId = null;
       eligibleForIntro = false;
       busy = false;
@@ -77,6 +114,7 @@ class PremiumBillingService extends ChangeNotifier {
   static Map<String, PremiumOffer> selectOffers(
     List<ProductDetails> products, {
     required bool eligibleForIntro,
+    List<SubscriptionPlan> plans = defaultPlans,
   }) {
     final result = <String, PremiumOffer>{};
     for (final product in products.whereType<GooglePlayProductDetails>()) {
@@ -86,11 +124,12 @@ class PremiumBillingService extends ChangeNotifier {
       final details = product
           .productDetails
           .subscriptionOfferDetails![product.subscriptionIndex!];
-      final introId = planOffers[details.basePlanId];
-      if (introId == null) continue;
+      final matches = plans.where((p) => p.id == details.basePlanId);
+      if (matches.isEmpty) continue;
+      final plan = matches.first;
+      final introId = plan.offerId;
       final phases = details.pricingPhases;
-      final period = details.basePlanId == 'monthly' ? 'P1M' : 'P6M';
-      // Do not advertise 50% or a six-month period unless Play confirms it.
+      final period = plan.billingPeriod;
       if (phases.isEmpty ||
           phases.last.billingPeriod != period ||
           phases.last.recurrenceMode != RecurrenceMode.infiniteRecurring) {
@@ -106,8 +145,8 @@ class PremiumBillingService extends ChangeNotifier {
             phases.first.billingCycleCount != 1 ||
             phases.first.recurrenceMode != RecurrenceMode.finiteRecurring ||
             phases.first.priceCurrencyCode != phases.last.priceCurrencyCode ||
-            phases.first.priceAmountMicros * 2 !=
-                phases.last.priceAmountMicros) {
+            phases.first.priceAmountMicros * 100 !=
+                phases.last.priceAmountMicros * (100 - plan.discountPercent)) {
           continue;
         }
       }
@@ -135,7 +174,9 @@ class PremiumBillingService extends ChangeNotifier {
     notifyListeners();
     try {
       if (!await InAppPurchase.instance.isAvailable()) {
-        throw StateError('Play unavailable');
+        throw StateError(
+          'Google Play Billing tidak tersedia. Gunakan perangkat Android dengan Play Store dan akun Google yang aktif.',
+        );
       }
       final eligibility = await _functions
           .httpsCallable('preparePremiumPurchase')
@@ -147,20 +188,32 @@ class PremiumBillingService extends ChangeNotifier {
           AuthService.instance.currentUser?.uid != user.uid) {
         return;
       }
-      if (response.error != null) throw StateError('Products unavailable');
+      if (response.error != null) {
+        throw StateError(
+          'Google Play gagal memuat produk (${response.error!.code}).',
+        );
+      }
+      plans = (eligibility.data['plans'] as List)
+          .map((data) => SubscriptionPlan.fromMap(data as Map))
+          .toList();
       eligibleForIntro = eligibility.data['eligibleForIntro'] == true;
       _obfuscatedAccountId = eligibility.data['obfuscatedAccountId'] as String;
       offers = selectOffers(
         response.productDetails,
         eligibleForIntro: eligibleForIntro,
+        plans: plans,
       );
-      if (offers.length != planOffers.length) {
-        message = 'Sebagian paket belum tersedia di Google Play. Silakan coba lagi nanti.';
+      if (offers.length != plans.length) {
+        message = 'Paket belum tersedia di Google Play. Pastikan base plan aktif, wilayah tersedia, dan aplikasi terpasang melalui jalur pengujian Play.';
       }
-    } catch (_) {
+    } on FirebaseFunctionsException catch (error) {
       if (generation != _generation) return;
-      message =
-          'Paket premium belum dapat dimuat. Periksa koneksi dan coba lagi.';
+      message = error.code == 'failed-precondition'
+          ? error.message
+          : 'Server pembelian belum dapat dihubungi (${error.code}). Periksa deployment Functions dan koneksi.';
+    } catch (error) {
+      if (generation != _generation) return;
+      message = error is StateError ? error.message.toString() : 'Paket premium belum dapat dimuat. Periksa koneksi dan konfigurasi langganan.';
     } finally {
       if (generation == _generation) {
         loading = false;
@@ -191,6 +244,19 @@ class PremiumBillingService extends ChangeNotifier {
       if (AuthService.instance.currentUser?.uid != user.uid ||
           generation != _generation) {
         return;
+      }
+      final currentPlans = (eligibility.data['plans'] as List)
+          .map((data) => SubscriptionPlan.fromMap(data as Map))
+          .toList();
+      final currentOffers = selectOffers(
+        [offer.product],
+        eligibleForIntro: eligibility.data['eligibleForIntro'] == true,
+        plans: currentPlans,
+      );
+      if (currentOffers[basePlanId]?.details.offerIdToken !=
+          offer.details.offerIdToken) {
+        offers = {};
+        throw StateError('Catalog changed');
       }
       if (offer.discounted && eligibility.data['eligibleForIntro'] != true) {
         offers = {};

@@ -98,10 +98,48 @@ lifetime; akun baru perlu diberi akses lagi oleh admin.
    Untuk menguji flavor dev, buat aplikasi Play terpisah dengan package
    `com.jajanku.app.dev` dan konfigurasi produk yang sama.
 
-Harga yang dapat dibeli selalu berasal dari Google Play. Harga Rp20.000 dan
-Rp100.000 yang terlihat saat produk belum dimuat hanya informasi paket;
-tombol pembelian dinonaktifkan. Aplikasi hanya menampilkan offer 50% jika
-periode, jumlah siklus, dan rasio harga dari Play sesuai konfigurasi di atas.
+Harga yang dapat dibeli selalu berasal dari Google Play. Ubah harga base plan dan
+harga offer melalui Play Console; aplikasi menampilkan harga terbaru yang dikembalikan Play.
+Tidak perlu mengubah kode atau mengisi harga duplikat di Firestore.
+
+## Katalog paket di luar users
+
+Koleksi **subscriptions** menyimpan satu dokumen per base plan. Aplikasi mengambil
+katalog melalui `preparePremiumPurchase`; hanya Console/Admin SDK yang dapat mengubahnya.
+Seed awal (ADC diperlukan; tanpa `--apply` hanya menampilkan rencana):
+
+```powershell
+node functions/scripts/seed-subscriptions.js --project jajanku-dev-25ae6
+node functions/scripts/seed-subscriptions.js --project jajanku-dev-25ae6 --apply
+# Jalankan juga untuk jajanku-26976 saat siap dipakai di prod.
+```
+
+Contoh dokumen `subscriptions/monthly`:
+
+```json
+{
+  "title": "1 bulan",
+  "billingPeriod": "P1M",
+  "offerId": "first-month-half",
+  "discountPercent": 50,
+  "enabled": true,
+  "sortOrder": 1
+}
+```
+
+ID dokumen harus sama dengan base plan ID di Play (`monthly`, `six-monthly`, atau
+base plan baru). `billingPeriod` menggunakan periode ISO dari Play, misalnya P1M,
+P6M, P1Y. `title` menjadi label durasi pada kartu dan penjelasan perpanjangan.
+`offerId` boleh null untuk paket tanpa diskon; `discountPercent` harus sesuai
+harga offer di Play. Offer yang didukung: satu periode diskon lalu harga normal.
+`enabled: false` menyembunyikan paket dari pembelian baru. Jangan hapus dokumen
+atau mengganti offer ID yang masih dipakai pelanggan: verifikasi renewal tetap
+membutuhkan katalog tersebut. Untuk offer berbeda, gunakan base plan baru.
+
+Tambahkan base plan di Play dan dokumen di Firestore untuk menambah paket tanpa
+rilis ulang. Ketuk **Muat ulang paket** untuk mengambil konfigurasi terbaru.
+Product ID tetap `jajanku_premium`. Koleksi ini adalah katalog, sedangkan status
+akses user tetap merupakan hasil verifikasi Google dan tidak ditentukan oleh harga.
 
 ## Firebase / Google Cloud
 

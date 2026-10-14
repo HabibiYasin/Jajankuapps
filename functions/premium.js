@@ -9,18 +9,18 @@ const everPremium = profile => profile?.hasEverBeenPremium === true ||
   ['premium', 'vip'].includes(profile?.plan) ||
   profile?.PremiumStartedAt != null || profile?.PremiumEndedAt != null;
 
-function readSubscription(purchase, now = Date.now()) {
+function readSubscription(purchase, now = Date.now(), plans = PLANS) {
   if (!['SUBSCRIPTION_STATE_PENDING', 'SUBSCRIPTION_STATE_ACTIVE', 'SUBSCRIPTION_STATE_PAUSED',
     'SUBSCRIPTION_STATE_IN_GRACE_PERIOD', 'SUBSCRIPTION_STATE_ON_HOLD', 'SUBSCRIPTION_STATE_CANCELED',
     'SUBSCRIPTION_STATE_EXPIRED', 'SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED'].includes(purchase.subscriptionState)) {
     throw new Error('Unsupported subscription state');
   }
   const items = (purchase.lineItems || []).filter(item =>
-    item.productId === PRODUCT_ID && Object.hasOwn(PLANS, item.offerDetails?.basePlanId));
+    item.productId === PRODUCT_ID && Object.hasOwn(plans, item.offerDetails?.basePlanId));
   if (items.length !== 1) throw new Error('Unsupported subscription');
   const item = items[0];
   const {basePlanId, offerId} = item.offerDetails;
-  if (offerId && offerId !== PLANS[basePlanId]) throw new Error('Unsupported offer');
+  if (offerId && offerId !== plans[basePlanId]) throw new Error('Unsupported offer');
   const pending = ['SUBSCRIPTION_STATE_PENDING', 'SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED']
     .includes(purchase.subscriptionState);
   const start = Date.parse(purchase.startTime);
