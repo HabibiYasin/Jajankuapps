@@ -21,7 +21,9 @@ Future<bool> requireLogin(BuildContext context) async {
 }
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.popOnLogin = true});
+
+  final bool popOnLogin;
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -61,6 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await action();
       if (!mounted) return;
       if (login && AuthService.instance.currentUser != null) {
+        if (!widget.popOnLogin) return;
         if (AuthService.needsEmailVerification(
           AuthService.instance.currentUser,
         )) {

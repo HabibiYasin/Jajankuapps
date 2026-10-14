@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/transaction_model.dart';
 import '../models/budget_totals.dart';
 import '../services/transaction_classifier.dart';
+import '../services/auth_service.dart';
+import '../services/tutorial_schedule.dart';
 import 'top_categories_widget.dart';
 import '../widgets/tutorial_dialog.dart';
 import '../theme/app_theme.dart';
@@ -43,36 +45,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _checkAndShowTutorialPopup() async {
+    final user = AuthService.instance.currentUser;
+    final createdAt = user?.metadata.creationTime;
+    if (user == null || createdAt == null) return;
     final prefs = await SharedPreferences.getInstance();
-
-    // Jangan tampilkan lagi pada hari yang sama jika pengguna memilih opsi ini.
-    String? lastHiddenDate = prefs.getString('tutorial_hidden_date');
-    if (lastHiddenDate != null) {
-      DateTime hideDate = DateTime.parse(lastHiddenDate);
-      DateTime now = DateTime.now();
-
-      if (now.year == hideDate.year &&
-          now.month == hideDate.month &&
-          now.day == hideDate.day) {
-        return;
-      }
-    }
-
-    // Beri jarak minimal 10 menit antar-popup otomatis, termasuk setelah
-    // aplikasi ditutup lalu dibuka kembali.
-    final lastShownValue = prefs.getString('tutorial_last_shown_at');
-    final lastShown = lastShownValue == null
-        ? null
-        : DateTime.tryParse(lastShownValue);
     final now = DateTime.now();
-    if (lastShown != null &&
-        now.difference(lastShown) < const Duration(minutes: 10)) {
+    if (!mounted || AuthService.instance.currentUser?.uid != user.uid) return;
+    if (!TutorialSchedule.shouldShow(
+      prefs,
+      uid: user.uid,
+      createdAt: createdAt,
+      now: now,
+    )) {
       return;
     }
-
-    await prefs.setString('tutorial_last_shown_at', now.toIso8601String());
-    if (!mounted) return;
-    await showTutorialDialog(context, allowHideToday: true);
+    final saved = await TutorialSchedule.recordShown(
+      prefs,
+      uid: user.uid,
+      now: now,
+    );
+    if (!saved || !mounted || AuthService.instance.currentUser?.uid != user.uid) {
+      return;
+    }
+    await showTutorialDialog(context);
   }
 
   double _calculateTotal(DateTime period, {bool monthly = false}) =>

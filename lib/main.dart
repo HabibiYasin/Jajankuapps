@@ -248,6 +248,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   void _consumeSharedImage() {
     if (!mounted ||
+        AuthService.instance.currentUser == null ||
+        AuthService.needsEmailVerification(AuthService.instance.currentUser) ||
         !_accountData.budgetReady ||
         (_accountData.uid != null && !_accountData.limits.isConfigured) ||
         _pendingSharedImage == null) {
@@ -467,6 +469,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   @override
   Widget build(BuildContext context) {
     final user = AuthService.instance.currentUser;
+    if (user == null) {
+      return const LoginScreen(popOnLogin: false);
+    }
     if (AuthService.needsEmailVerification(user)) {
       return const EmailVerificationScreen();
     }
