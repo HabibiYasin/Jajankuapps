@@ -22,47 +22,49 @@ PricingPhaseWrapper phase(
       : RecurrenceMode.infiniteRecurring,
 );
 
-List<GooglePlayProductDetails> products({int discountPrice = 10000}) =>
-    GooglePlayProductDetails.fromProductDetails(
-      ProductDetailsWrapper(
-        description: 'Premium',
-        name: 'Premium',
-        productId: 'jajanku_premium',
-        productType: ProductType.subs,
-        title: 'Premium',
-        subscriptionOfferDetails: [
-          SubscriptionOfferDetailsWrapper(
-            basePlanId: 'monthly',
-            offerTags: [],
-            offerIdToken: 'normal-token',
-            pricingPhases: [phase(20000)],
-          ),
-          SubscriptionOfferDetailsWrapper(
-            basePlanId: 'monthly',
-            offerId: 'first-month-half',
-            offerTags: [],
-            offerIdToken: 'intro-token',
-            pricingPhases: [phase(discountPrice, intro: true), phase(20000)],
-          ),
-          SubscriptionOfferDetailsWrapper(
-            basePlanId: 'six-monthly',
-            offerTags: [],
-            offerIdToken: 'six-token',
-            pricingPhases: [phase(100000, period: 'P6M')],
-          ),
-          SubscriptionOfferDetailsWrapper(
-            basePlanId: 'six-monthly',
-            offerId: 'first-six-months-half',
-            offerTags: [],
-            offerIdToken: 'six-intro-token',
-            pricingPhases: [
-              phase(50000, intro: true, period: 'P6M'),
-              phase(100000, period: 'P6M'),
-            ],
-          ),
+List<GooglePlayProductDetails> products({
+  int discountPrice = 10000,
+  String offerId = 'first-month-half',
+}) => GooglePlayProductDetails.fromProductDetails(
+  ProductDetailsWrapper(
+    description: 'Premium',
+    name: 'Premium',
+    productId: 'jajanku_premium',
+    productType: ProductType.subs,
+    title: 'Premium',
+    subscriptionOfferDetails: [
+      SubscriptionOfferDetailsWrapper(
+        basePlanId: 'monthly',
+        offerTags: [],
+        offerIdToken: 'normal-token',
+        pricingPhases: [phase(20000)],
+      ),
+      SubscriptionOfferDetailsWrapper(
+        basePlanId: 'monthly',
+        offerId: offerId,
+        offerTags: [],
+        offerIdToken: 'intro-token',
+        pricingPhases: [phase(discountPrice, intro: true), phase(20000)],
+      ),
+      SubscriptionOfferDetailsWrapper(
+        basePlanId: 'six-monthly',
+        offerTags: [],
+        offerIdToken: 'six-token',
+        pricingPhases: [phase(100000, period: 'P6M')],
+      ),
+      SubscriptionOfferDetailsWrapper(
+        basePlanId: 'six-monthly',
+        offerId: 'first-six-months-half',
+        offerTags: [],
+        offerIdToken: 'six-intro-token',
+        pricingPhases: [
+          phase(50000, intro: true, period: 'P6M'),
+          phase(100000, period: 'P6M'),
         ],
       ),
-    );
+    ],
+  ),
+);
 
 void main() {
   test(
@@ -128,6 +130,53 @@ void main() {
       );
     },
   );
+  test('voucher requires exact Play offer, amount and period; no full-price fallback', () {
+    final voucher = PremiumVoucher(
+      name: 'cobapremium',
+      title: 'Cobain Premium',
+      eligibleUntil: DateTime.now().add(const Duration(days: 1)),
+      quotes: {
+        'monthly': {'price': 20000, 'total': 5000},
+      },
+    );
+    final offers = PremiumBillingService.selectOffers(
+      products(discountPrice: 5000, offerId: 'cobapremium'),
+      eligibleForIntro: true,
+      voucher: voucher,
+    );
+    expect(offers['monthly']!.price, 'Rp5000');
+    expect(offers['monthly']!.details.offerIdToken, 'intro-token');
+    expect(
+      PremiumBillingService.selectOffers(
+        products(),
+        eligibleForIntro: true,
+        voucher: voucher,
+      ).containsKey('monthly'),
+      isFalse,
+    );
+    expect(
+      PremiumBillingService.selectOffers(
+        products(discountPrice: 6000, offerId: 'cobapremium'),
+        eligibleForIntro: true,
+        voucher: voucher,
+      ).containsKey('monthly'),
+      isFalse,
+    );
+    final expired = PremiumVoucher(
+      name: voucher.name,
+      title: voucher.title,
+      eligibleUntil: DateTime.now().subtract(const Duration(seconds: 1)),
+      quotes: voucher.quotes,
+    );
+    expect(
+      PremiumBillingService.selectOffers(
+        products(discountPrice: 5000, offerId: 'cobapremium'),
+        eligibleForIntro: true,
+        voucher: expired,
+      ).containsKey('monthly'),
+      isFalse,
+    );
+  });
   testWidgets('Personalisasi opens Upgrade Akun and Guest must sign in', (
     tester,
   ) async {

@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {userStatus, voucherQuote} = require('../catalog');
+const {userStatus, voucherQuote, selectVoucher} = require('../catalog');
 const now = Date.parse('2026-10-15T00:00:00Z');
 const expiry = Date.parse('2027-01-01T17:00:00Z');
 const voucher = {enabled:true, type:'percentage', price:75, userStatus:'free', subscriptionId:null,
@@ -27,4 +27,13 @@ test('expiry, disabled, audience, subscription and malformed discounts are rejec
   assert.equal(voucherQuote(voucher, plan, {}, expiry), null);
   assert.ok(voucherQuote(voucher, plan, {}, expiry-1));
   assert.equal(voucherQuote(voucher, plan, {hasEverBeenPremium:true,plan:'free'}, now), null);
+});
+
+test('auto selection only returns eligible quotes; explicit removal stays empty', () => {
+  assert.equal(selectVoucher(voucher, '', [plan], {}, now), null);
+  assert.equal(selectVoucher(voucher, 'cobapremium', [plan], {hasEverBeenPremium:true}, now), null);
+  assert.equal(selectVoucher(voucher, 'cobapremium', [plan], {}, expiry), null);
+  const result = selectVoucher({...voucher,title:'Cobain Premium'}, 'cobapremium', [plan], {}, now);
+  assert.equal(result.title, 'Cobain Premium');
+  assert.equal(result.quotes.monthly.total, 2500);
 });

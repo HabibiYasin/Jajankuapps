@@ -33,6 +33,30 @@ class SubscriptionPlan {
       );
 }
 
+class PremiumVoucher {
+  const PremiumVoucher({
+    required this.name,
+    required this.title,
+    required this.eligibleUntil,
+    required this.quotes,
+  });
+  final String name;
+  final String title;
+  final DateTime eligibleUntil;
+  final Map<String, Map<dynamic, dynamic>> quotes;
+  factory PremiumVoucher.fromMap(Map<dynamic, dynamic> data) => PremiumVoucher(
+    name: data['name'] as String,
+    title: data['title'] as String,
+    eligibleUntil: DateTime.fromMillisecondsSinceEpoch(
+      (data['eligibleUntil'] as num).toInt(),
+    ),
+    quotes: (data['quotes'] as Map).map(
+      (key, value) => MapEntry(key as String, value as Map),
+    ),
+  );
+  bool get expired => !DateTime.now().isBefore(eligibleUntil);
+}
+
 class PremiumOffer {
   const PremiumOffer(this.product, this.details);
   final GooglePlayProductDetails product;
@@ -51,6 +75,22 @@ class PremiumBillingService extends ChangeNotifier {
     SubscriptionPlan(id: 'six-monthly', title: '6 bulan', billingPeriod: 'P6M'),
   ];
   List<SubscriptionPlan> plans = [];
+  PremiumVoucher? voucher;
+  String? _voucherCode; // null: automatic, empty: explicitly removed
+  Timer? _voucherExpiry;
+  String? voucherMessage;
+
+  Future<void> applyVoucher(String code) async {
+    if (loading || busy) return;
+    _voucherCode = code.trim().toLowerCase();
+    await loadOffers();
+  }
+
+  Future<void> removeVoucher() async {
+    if (loading || busy) return;
+    _voucherCode = '';
+    await loadOffers();
+  }
 
   bool get supported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -89,6 +129,10 @@ class PremiumBillingService extends ChangeNotifier {
       ++_generation;
       offers = {};
       plans = [];
+      voucher = null;
+      voucherMessage = null;
+      _voucherCode = null;
+      _voucherExpiry?.cancel();
       _obfuscatedAccountId = null;
       eligibleForIntro = false;
       busy = false;
@@ -103,6 +147,7 @@ class PremiumBillingService extends ChangeNotifier {
     List<ProductDetails> products, {
     required bool eligibleForIntro,
     List<SubscriptionPlan> plans = defaultPlans,
+    PremiumVoucher? voucher,
   }) {
     final result = <String, PremiumOffer>{};
     for (final product in products.whereType<GooglePlayProductDetails>()) {
@@ -122,8 +167,25 @@ class PremiumBillingService extends ChangeNotifier {
           phases.last.recurrenceMode != RecurrenceMode.infiniteRecurring) {
         continue;
       }
-      // Database vouchers are not Google Play offer tokens.
-      if (details.offerId != null || phases.length != 1) continue;
+      final quote = voucher?.quotes[plan.id];
+      if (quote != null) {
+        if (voucher!.expired ||
+            details.offerId != voucher.name ||
+            phases.length != 2 ||
+            phases.first.billingPeriod != period ||
+            phases.first.billingCycleCount != 1 ||
+            phases.first.recurrenceMode != RecurrenceMode.finiteRecurring ||
+            phases.first.priceCurrencyCode != 'IDR' ||
+            phases.last.priceCurrencyCode != 'IDR' ||
+            phases.first.priceAmountMicros !=
+                (quote['total'] as num) * 1000000 ||
+            phases.last.priceAmountMicros !=
+                (quote['price'] as num) * 1000000) {
+          continue;
+        }
+      } else if (details.offerId != null || phases.length != 1) {
+        continue;
+      }
       if (result[details.basePlanId]?.discounted != true) {
         result[details.basePlanId] = PremiumOffer(product, details);
       }
@@ -145,6 +207,9 @@ class PremiumBillingService extends ChangeNotifier {
     loading = true;
     message = null;
     offers = {};
+    voucher = null;
+    voucherMessage = null;
+    _voucherExpiry?.cancel();
     notifyListeners();
     try {
       if (!await InAppPurchase.instance.isAvailable()) {
@@ -154,7 +219,7 @@ class PremiumBillingService extends ChangeNotifier {
       }
       final eligibility = await _functions
           .httpsCallable('preparePremiumPurchase')
-          .call();
+          .call({'voucherCode': _voucherCode});
       final response = await InAppPurchase.instance.queryProductDetails({
         productId,
       });
@@ -167,6 +232,9 @@ class PremiumBillingService extends ChangeNotifier {
           'Google Play gagal memuat produk (${response.error!.code}).',
         );
       }
+      voucher = eligibility.data['voucher'] == null
+          ? null
+          : PremiumVoucher.fromMap(eligibility.data['voucher'] as Map);
       plans = (eligibility.data['plans'] as List)
           .map((data) => SubscriptionPlan.fromMap(data as Map))
           .toList();
@@ -176,7 +244,26 @@ class PremiumBillingService extends ChangeNotifier {
         response.productDetails,
         eligibleForIntro: eligibleForIntro,
         plans: plans,
+        voucher: voucher,
       );
+      if (voucher != null) {
+        final ready = voucher!.quotes.keys.any(
+          (id) => offers[id]?.discounted == true,
+        );
+        voucherMessage = ready
+            ? '${voucher!.title} diterapkan pada paket yang memenuhi syarat.'
+            : '${voucher!.title} memenuhi syarat, tetapi harga promo belum tersedia di Google Play. Hapus voucher untuk memakai harga normal.';
+        final remaining = voucher!.eligibleUntil.difference(DateTime.now());
+        _voucherExpiry = Timer(
+          remaining.isNegative ? Duration.zero : remaining,
+          () {
+            offers = {};
+            voucher = null;
+            voucherMessage = 'Voucher sudah kedaluwarsa. Muat ulang paket.';
+            notifyListeners();
+          },
+        );
+      }
       if (offers.length != plans.length) {
         message = 'Paket belum tersedia di Google Play. Pastikan base plan aktif, wilayah tersedia, dan aplikasi terpasang melalui jalur pengujian Play.';
       }
@@ -214,7 +301,7 @@ class PremiumBillingService extends ChangeNotifier {
       // Recheck account history immediately before opening Google's payment sheet.
       final eligibility = await _functions
           .httpsCallable('preparePremiumPurchase')
-          .call();
+          .call({'voucherCode': _voucherCode});
       if (AuthService.instance.currentUser?.uid != user.uid ||
           generation != _generation) {
         return;
@@ -226,17 +313,16 @@ class PremiumBillingService extends ChangeNotifier {
         [offer.product],
         eligibleForIntro: eligibility.data['eligibleForIntro'] == true,
         plans: currentPlans,
+        voucher: eligibility.data['voucher'] == null
+            ? null
+            : PremiumVoucher.fromMap(eligibility.data['voucher'] as Map),
       );
       if (currentOffers[basePlanId]?.details.offerIdToken !=
           offer.details.offerIdToken) {
         offers = {};
         throw StateError('Catalog changed');
       }
-      if (offer.discounted && eligibility.data['eligibleForIntro'] != true) {
-        offers = {};
-        eligibleForIntro = false;
-        throw StateError('Eligibility changed');
-      }
+
       final opened = await InAppPurchase.instance.buyNonConsumable(
         purchaseParam: GooglePlayPurchaseParam(
           productDetails: offer.product,

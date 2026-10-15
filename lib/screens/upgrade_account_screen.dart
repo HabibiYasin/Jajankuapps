@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/premium_billing_service.dart';
 import '../services/profile_plan_store.dart';
 import '../widgets/premium_access_details.dart';
+import '../widgets/premium_voucher_field.dart';
 import 'login_screen.dart';
 
 class UpgradeAccountScreen extends StatefulWidget {
@@ -94,9 +95,9 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
     final duration = plan.title;
     const normalPrice = 'Harga tersedia setelah terhubung ke Google Play';
     final offer = _billing.offers[id];
-    final discount =
-        offer?.discounted == true && _status?.hasEverBeenPremium == false;
-    final available = offer != null && (!offer.discounted || discount);
+    final discount = offer?.discounted == true;
+    final available = offer != null;
+    final voucherApplies = _billing.voucher?.quotes.containsKey(id) == true;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -109,6 +110,14 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
             ),
             const SizedBox(height: 8),
 
+            if (voucherApplies) Text(_billing.voucher!.title),
+            if (discount)
+              Text(
+                offer!.renewalPrice,
+                style: const TextStyle(decoration: TextDecoration.lineThrough),
+              ),
+            if (voucherApplies && !available)
+              const Text('Harga voucher belum tersedia untuk paket ini.'),
             Text(
               offer?.price ?? normalPrice,
               style: Theme.of(context).textTheme.headlineSmall,
@@ -195,6 +204,14 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
                   'Nikmati riwayat dan laporan hingga 12 bulan, grafik 7 hari, serta personalisasi kartu pengeluaran.',
                 ),
                 const SizedBox(height: 12),
+                PremiumVoucherField(
+                  key: ValueKey(_uid),
+                  appliedCode: _billing.voucher?.name,
+                  message: _billing.voucherMessage,
+                  busy: _billing.loading || _billing.busy,
+                  onApply: (code) => unawaited(_billing.applyVoucher(code)),
+                  onRemove: () => unawaited(_billing.removeVoucher()),
+                ),
                 ..._billing.plans.map(_plan),
                 const Text(
                   'Langganan diperpanjang otomatis dengan harga normal sampai dibatalkan. Batalkan kapan saja melalui Google Play; akses tetap tersedia hingga periode aktif berakhir. Harga final ditampilkan pada pembayaran Google Play.',

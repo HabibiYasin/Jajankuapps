@@ -5,7 +5,7 @@ const {getFirestore, Timestamp, FieldValue} = require('firebase-admin/firestore'
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onMessagePublished} = require('firebase-functions/v2/pubsub');
 const {onDocumentWritten} = require('firebase-functions/v2/firestore');
-const {userStatus, voucherQuote} = require('./catalog');
+const {userStatus, voucherQuote, selectVoucher} = require('./catalog');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {defineString} = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
@@ -48,6 +48,11 @@ async function subscriptionCatalog() {
 
 exports.preparePremiumPurchase = onCall({region}, async request => {
   const uid = requireUser(request);
+  const requestedVoucher = request.data?.voucherCode;
+  if (requestedVoucher != null && (typeof requestedVoucher !== 'string' || !/^[a-z0-9_-]{0,80}$/.test(requestedVoucher))) {
+    throw new HttpsError('invalid-argument', 'Kode voucher tidak valid.');
+  }
+  const voucherName = requestedVoucher ?? 'cobapremium';
   const plans = (await subscriptionCatalog()).filter(plan => plan.enabled === true);
   if (!plans.length) throw new HttpsError('failed-precondition', 'Paket langganan belum dikonfigurasi. Hubungi admin.');
   return db.runTransaction(async tx => {
@@ -55,9 +60,12 @@ exports.preparePremiumPurchase = onCall({region}, async request => {
     const [profile, history] = await Promise.all([tx.get(profileRef), tx.get(accountRef(uid))]);
     if (!profile.exists) throw new HttpsError('failed-precondition', 'Profil belum tersinkron. Coba lagi.');
     const ever = everPremium(profile.data()) || history.data()?.hasEverBeenPremium === true;
+    const voucherDoc = voucherName ? await tx.get(db.collection('vouchers').doc(voucherName)) : null;
+    const voucher = selectVoucher(voucherDoc?.data(), voucherName, plans, {...profile.data(), hasEverBeenPremium: ever});
+    if (requestedVoucher && !voucher) throw new HttpsError('failed-precondition', 'Voucher tidak berlaku untuk akun atau paket ini, atau sudah kedaluwarsa.');
     tx.set(accountRef(uid), {uid, hasEverBeenPremium: ever}, {merge: true});
     tx.update(profileRef, {hasEverBeenPremium: ever, userStatus: userStatus({...profile.data(), hasEverBeenPremium: ever})});
-    return {eligibleForIntro: !ever, obfuscatedAccountId: accountId(uid), plans};
+    return {eligibleForIntro: !ever, obfuscatedAccountId: accountId(uid), plans, voucher};
   });
 });
 
@@ -79,13 +87,25 @@ async function synchronize(token, uid) {
     const legacyOffers = {monthly: 'first-month-half', 'six-monthly': 'first-six-months-half'};
     const verificationPlans = {...plans};
     for (const id of Object.keys(verificationPlans)) verificationPlans[id] = legacyOffers[id] || null;
+    const purchasedOffer = purchase.lineItems?.find(item => item.productId === PRODUCT_ID)?.offerDetails;
+    let voucherData;
+    if (purchasedOffer?.offerId && /^[a-z0-9_-]{1,80}$/.test(purchasedOffer.offerId)) {
+      voucherData = (await tx.get(db.collection('vouchers').doc(purchasedOffer.offerId))).data();
+      // Already verified purchases retain access after voucher expiry/deletion.
+      if (voucherData || (previous.data()?.purchased && previous.data()?.offerId === purchasedOffer.offerId)) {
+        if (Object.hasOwn(verificationPlans, purchasedOffer.basePlanId)) verificationPlans[purchasedOffer.basePlanId] = purchasedOffer.offerId;
+      }
+    }
     let parsed;
     try { parsed = readSubscription(purchase, Date.now(), verificationPlans); }
     catch { throw new HttpsError('invalid-argument', 'Produk atau masa langganan tidak dikenali.'); }
     const ever = everPremium(profile.data()) || history.data()?.hasEverBeenPremium === true;
     // Only the first successfully granted token can use an introductory offer.
     // Pending tokens do not reserve eligibility or count as having been VIP.
-    if (rejectIntro(parsed, previous.data(), ever)) {
+    const voucherPlan = catalog.find(plan => plan.id === parsed.basePlanId);
+    const invalidVoucher = voucherData && parsed.purchased && !previous.data()?.purchased &&
+      !voucherQuote(voucherData, voucherPlan, {...profile.data(), hasEverBeenPremium: ever});
+    if (previous.data()?.rejected || invalidVoucher || (!voucherData && rejectIntro(parsed, previous.data(), ever))) {
       tx.set(ref, {
         ...parsed, uid, token, active: false, rejected: true,
         refundRequested: previous.data()?.refundRequested === true,
@@ -139,7 +159,7 @@ async function synchronize(token, uid) {
       await playRequest(`orders/${encodeURIComponent(verified.orderId)}:refund?revoke=true`, 'POST');
       await ref.update({refundRequested: true, track: false});
     }
-    throw new HttpsError('failed-precondition', 'Akun sudah pernah premium. Pembelian diskon ditolak dan pengembalian dana diminta.');
+    throw new HttpsError('failed-precondition', 'Akun tidak memenuhi syarat penawaran. Pembelian diskon ditolak dan pengembalian dana diminta.');
   }
   if (verified.parsed.purchased && verified.purchase.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {
     await playRequest(`purchases/subscriptions/${PRODUCT_ID}/tokens/${encodeURIComponent(token)}:acknowledge`, 'POST', {});
@@ -238,5 +258,5 @@ exports.previewPremiumVoucher = onCall({region}, async request => {
   }
   const quote = voucherQuote(voucher.data(), {...subscription.data(), id: subscriptionId}, profile.data());
   if (!quote) throw new HttpsError('failed-precondition', 'Voucher tidak berlaku untuk akun atau paket ini.');
-  return {...quote, title: voucher.data().title, name, checkoutSupported: false};
+  return {...quote, title: voucher.data().title, name, requiresPlayOffer: true};
 });

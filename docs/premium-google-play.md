@@ -126,9 +126,33 @@ Voucher berlaku sampai akhir 1 Januari 2027 WIB. `type` mendukung `percentage`
 agar total tidak negatif. `userStatus` mendukung free, subscriber, exsubscriber;
 `subscriptionId` berisi ID dokumen paket atau null. Callable `previewPremiumVoucher`
 menerima `name` dan `subscriptionId`, memvalidasi akun, masa berlaku dan paket,
-lalu mengembalikan perhitungan beserta `title`. Ini baru preview katalog:
-`checkoutSupported: false`. Voucher database belum terhubung ke checkout Google Play;
-aplikasi tidak mengiklankan diskon otomatis dari katalog ini.
+lalu mengembalikan perhitungan beserta `title` dan `requiresPlayOffer: true`.
+
+Halaman Upgrade Akun memiliki kolom kode voucher, tombol Terapkan dan Hapus.
+`preparePremiumPurchase` otomatis memilih `cobapremium` jika akun memenuhi syarat.
+Parameter `voucherCode: null` memilih otomatis, string memilih kode manual,
+string kosong menonaktifkan auto-apply sampai akun berganti. Server memeriksa
+riwayat billing juga, sehingga menghapus profil tidak mengulang kelayakan.
+Voucher invalid/nonaktif/kedaluwarsa atau salah paket tidak mendapat quote.
+
+Untuk pembayaran, buat offer ID **cobapremium** pada masing-masing base plan
+Google Play (ID voucher sama dengan ID offer, tanpa menambahkan field offerId
+ke subscriptions). Offer harus memiliki satu siklus diskon lalu harga normal:
+- monthly: Rp2.500 periode pertama, lalu Rp10.000 per bulan.
+- six-monthly: Rp12.500 periode pertama, lalu Rp50.000 per enam bulan.
+
+Aplikasi hanya memilih offer yang dikembalikan Play jika ID, mata uang IDR,
+periode, jumlah siklus, harga diskon, dan harga perpanjangan cocok dengan quote
+server. Harga kartu berasal dari Play. Jika voucher eligible tetapi offer belum
+tersedia, paket terkait tidak dapat dibeli sampai voucher dihapus atau offer
+tersedia; aplikasi tidak diam-diam memakai harga penuh. Kelayakan diperiksa ulang
+sebelum membuka pembayaran. Voucher yang kedaluwarsa saat halaman terbuka
+menonaktifkan pilihan paket hingga dimuat ulang. Langganan terverifikasi tetap
+bisa diperpanjang meskipun voucher kemudian dinonaktifkan atau dihapus.
+
+Deploy Functions dan build aplikasi terbaru diperlukan. Project yang masih Spark
+perlu ditingkatkan ke Blaze sebelum deployment Functions dapat dilakukan.
+Panduan offer token: https://developer.android.com/google/play/billing/integrate
 
 Field `users.userStatus` mengikuti aturan:
 - `hasEverBeenPremium` bukan true: free.

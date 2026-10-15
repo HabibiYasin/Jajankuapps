@@ -18,4 +18,11 @@ function voucherQuote(voucher, subscription, profile, now = Date.now()) {
   discount = Math.min(price, discount);
   return {price, discount, total: price - discount, currency: 'IDR'};
 }
-module.exports = {userStatus, voucherQuote};
+function selectVoucher(voucher, name, plans, profile, now = Date.now()) {
+  if (!name || !voucher) return null;
+  const quotes = Object.fromEntries(plans.map(plan => [plan.id, voucherQuote(voucher, plan, profile, now)])
+    .filter(([, quote]) => quote != null));
+  if (!Object.keys(quotes).length) return null;
+  return {name, title: voucher.title, eligibleUntil: voucher.eligibleUntil.toMillis(), quotes};
+}
+module.exports = {userStatus, voucherQuote, selectVoucher};
