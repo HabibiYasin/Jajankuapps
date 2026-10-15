@@ -65,17 +65,20 @@ List<GooglePlayProductDetails> products({int discountPrice = 10000}) =>
     );
 
 void main() {
-  test('first-time account selects exact 50% Play offers for both plans', () {
-    final offers = PremiumBillingService.selectOffers(
-      products(),
-      eligibleForIntro: true,
-    );
-    expect(offers['monthly']!.details.offerIdToken, 'intro-token');
-    expect(offers['monthly']!.price, 'Rp10000');
-    expect(offers['monthly']!.renewalPrice, 'Rp20000');
-    expect(offers['six-monthly']!.details.offerIdToken, 'six-intro-token');
-    expect(offers['six-monthly']!.renewalPrice, 'Rp100000');
-  });
+  test(
+    'catalog without offers selects base prices even for first-time accounts',
+    () {
+      final offers = PremiumBillingService.selectOffers(
+        products(),
+        eligibleForIntro: true,
+      );
+      expect(offers['monthly']!.details.offerIdToken, 'normal-token');
+      expect(offers['monthly']!.price, 'Rp20000');
+      expect(offers['monthly']!.renewalPrice, 'Rp20000');
+      expect(offers['six-monthly']!.details.offerIdToken, 'six-token');
+      expect(offers['six-monthly']!.renewalPrice, 'Rp100000');
+    },
+  );
   test('former VIP can only select normal prices, independent of returned product order', () {
     final offers = PremiumBillingService.selectOffers(
       products().reversed.toList(),
@@ -95,33 +98,36 @@ void main() {
       isEmpty,
     );
   });
-  test('remote catalog controls visibility and discount percentage', () {
-    final configured = [
-      const SubscriptionPlan(
-        id: 'monthly',
-        title: 'Bulanan',
-        billingPeriod: 'P1M',
-        offerId: 'first-month-half',
-        discountPercent: 25,
-      ),
-    ];
-    final offers = PremiumBillingService.selectOffers(
-      products(discountPrice: 15000),
-      eligibleForIntro: true,
-      plans: configured,
-    );
-    expect(offers.keys, ['monthly']);
-    expect(offers['monthly']!.price, 'Rp15000');
-    expect(offers['monthly']!.discounted, isTrue);
-    expect(
-      PremiumBillingService.selectOffers(
-        products(),
+  test(
+    'remote catalog controls visibility without applying database discounts',
+    () {
+      final configured = [
+        const SubscriptionPlan(
+          id: 'monthly',
+          title: 'Bulanan',
+          billingPeriod: 'P1M',
+          price: 10000,
+          durationDays: 30,
+        ),
+      ];
+      final offers = PremiumBillingService.selectOffers(
+        products(discountPrice: 15000),
         eligibleForIntro: true,
-        plans: [],
-      ),
-      isEmpty,
-    );
-  });
+        plans: configured,
+      );
+      expect(offers.keys, ['monthly']);
+      expect(offers['monthly']!.price, 'Rp20000');
+      expect(offers['monthly']!.discounted, isFalse);
+      expect(
+        PremiumBillingService.selectOffers(
+          products(),
+          eligibleForIntro: true,
+          plans: [],
+        ),
+        isEmpty,
+      );
+    },
+  );
   testWidgets('Personalisasi opens Upgrade Akun and Guest must sign in', (
     tester,
   ) async {

@@ -4,6 +4,8 @@ const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, Timestamp, FieldValue} = require('firebase-admin/firestore');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onMessagePublished} = require('firebase-functions/v2/pubsub');
+const {onDocumentWritten} = require('firebase-functions/v2/firestore');
+const {userStatus, voucherQuote} = require('./catalog');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {defineString} = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
@@ -54,9 +56,7 @@ exports.preparePremiumPurchase = onCall({region}, async request => {
     if (!profile.exists) throw new HttpsError('failed-precondition', 'Profil belum tersinkron. Coba lagi.');
     const ever = everPremium(profile.data()) || history.data()?.hasEverBeenPremium === true;
     tx.set(accountRef(uid), {uid, hasEverBeenPremium: ever}, {merge: true});
-    if (ever && profile.data().hasEverBeenPremium !== true) {
-      tx.update(profileRef, {hasEverBeenPremium: true});
-    }
+    tx.update(profileRef, {hasEverBeenPremium: ever, userStatus: userStatus({...profile.data(), hasEverBeenPremium: ever})});
     return {eligibleForIntro: !ever, obfuscatedAccountId: accountId(uid), plans};
   });
 });
@@ -65,7 +65,7 @@ async function synchronize(token, uid) {
   const ref = purchaseRef(token);
   // Disabled plans still verify renewals and existing paid subscriptions.
   const catalog = await subscriptionCatalog();
-  const plans = Object.fromEntries(catalog.map(plan => [plan.id, plan.offerId || null]));
+  const plans = Object.fromEntries(catalog.map(plan => [plan.id, null]));
   const verified = await db.runTransaction(async tx => {
     const [previous, profile, history, all] = await Promise.all([
       tx.get(ref), tx.get(db.collection('users').doc(uid)), tx.get(accountRef(uid)),
@@ -75,8 +75,12 @@ async function synchronize(token, uid) {
     const purchase = await fetchPurchase(token);
     try { assertOwner(purchase, accountId(uid), previous.data()?.uid, uid); }
     catch { throw new HttpsError('permission-denied', 'Pembelian ini milik akun Jajanku lain.'); }
+    // Keep verifying historical introductory purchases after catalog migration.
+    const legacyOffers = {monthly: 'first-month-half', 'six-monthly': 'first-six-months-half'};
+    const verificationPlans = {...plans};
+    for (const id of Object.keys(verificationPlans)) verificationPlans[id] = legacyOffers[id] || null;
     let parsed;
-    try { parsed = readSubscription(purchase, Date.now(), plans); }
+    try { parsed = readSubscription(purchase, Date.now(), verificationPlans); }
     catch { throw new HttpsError('invalid-argument', 'Produk atau masa langganan tidak dikenali.'); }
     const ever = everPremium(profile.data()) || history.data()?.hasEverBeenPremium === true;
     // Only the first successfully granted token can use an introductory offer.
@@ -116,6 +120,7 @@ async function synchronize(token, uid) {
         .sort((a, b) => b.end - a.end)[0];
       tx.update(profile.ref, {
         plan: active ? 'premium' : 'free',
+        userStatus: userStatus({plan: active ? 'premium' : 'free', hasEverBeenPremium: ever || record.purchased}),
         PremiumStartedAt: latest?.start != null ? Timestamp.fromMillis(latest.start) : null,
         PremiumEndedAt: latest?.end != null ? Timestamp.fromMillis(latest.end) : null,
         hasEverBeenPremium: ever || record.purchased,
@@ -202,4 +207,36 @@ exports.reconcilePremiumPurchases = onSchedule({region, schedule: 'every 60 minu
     cursor = page.docs.at(-1);
   }
   if (failed) throw new Error('Some Play purchases could not be reconciled.');
+});
+
+
+// Re-read the current document in a transaction to tolerate out-of-order events.
+exports.syncUserStatus = onDocumentWritten({region, document: 'users/{uid}'}, async event => {
+  const ref = db.collection('users').doc(event.params.uid);
+  await db.runTransaction(async tx => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) return;
+    const status = userStatus(snapshot.data());
+    if (snapshot.data().userStatus !== status) tx.update(ref, {userStatus: status});
+  });
+});
+
+exports.previewPremiumVoucher = onCall({region}, async request => {
+  const uid = requireUser(request);
+  const name = request.data?.name;
+  const subscriptionId = request.data?.subscriptionId;
+  if (typeof name !== 'string' || !/^[a-z0-9_-]{1,80}$/.test(name) ||
+      typeof subscriptionId !== 'string' || !/^[a-z0-9-]{1,80}$/.test(subscriptionId)) {
+    throw new HttpsError('invalid-argument', 'Voucher atau paket tidak valid.');
+  }
+  const [profile, voucher, subscription] = await Promise.all([
+    db.collection('users').doc(uid).get(), db.collection('vouchers').doc(name).get(),
+    db.collection('subscriptions').doc(subscriptionId).get(),
+  ]);
+  if (!profile.exists || !subscription.exists || subscription.data().enabled !== true) {
+    throw new HttpsError('failed-precondition', 'Profil atau paket tidak tersedia.');
+  }
+  const quote = voucherQuote(voucher.data(), {...subscription.data(), id: subscriptionId}, profile.data());
+  if (!quote) throw new HttpsError('failed-precondition', 'Voucher tidak berlaku untuk akun atau paket ini.');
+  return {...quote, title: voucher.data().title, name, checkoutSupported: false};
 });

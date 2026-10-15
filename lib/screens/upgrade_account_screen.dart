@@ -108,8 +108,7 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            if (discount)
-              Text('Diskon ${plan.discountPercent}% untuk pembelian pertama'),
+
             Text(
               offer?.price ?? normalPrice,
               style: Theme.of(context).textTheme.headlineSmall,
@@ -196,14 +195,6 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
                   'Nikmati riwayat dan laporan hingga 12 bulan, grafik 7 hari, serta personalisasi kartu pengeluaran.',
                 ),
                 const SizedBox(height: 12),
-                if (_status?.hasEverBeenPremium == false)
-                  const Text(
-                    'Penawaran periode pertama tersedia bagi akun yang belum pernah VIP/premium, sesuai kelayakan Google Play.',
-                  ),
-                if (_status?.hasEverBeenPremium == true)
-                  const Text(
-                    'Akun ini sudah pernah premium. Paket berikut menggunakan harga normal.',
-                  ),
                 ..._billing.plans.map(_plan),
                 const Text(
                   'Langganan diperpanjang otomatis dengan harga normal sampai dibatalkan. Batalkan kapan saja melalui Google Play; akses tetap tersedia hingga periode aktif berakhir. Harga final ditampilkan pada pembayaran Google Play.',

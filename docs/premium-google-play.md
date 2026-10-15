@@ -11,6 +11,7 @@ Firestore memakai dokumen `users/{uid}`, bukan tabel SQL.
 | Field | Nilai / fungsi |
 | --- | --- |
 | `plan` | `free` atau `premium` |
+| `userStatus` | `free`, `subscriber`, atau `exsubscriber`, dikelola server |
 | `PremiumStartedAt` | Timestamp mulai langganan terverifikasi Google; null sebelum premium |
 | `PremiumEndedAt` | Timestamp akhir periode aktif dari Google; berubah pada perpanjangan |
 | `hasEverBeenPremium` | Riwayat pernah premium, tetap true setelah berakhir |
@@ -79,67 +80,78 @@ lifetime; akun baru perlu diberi akses lagi oleh admin.
 
 | Base plan ID | Jenis | Periode penagihan | Harga Indonesia |
 | --- | --- | --- | --- |
-| `monthly` | Auto-renewing | 1 bulan | Rp20.000 |
-| `six-monthly` | Auto-renewing | 6 bulan | Rp100.000 |
+| `monthly` | Auto-renewing | 1 bulan | Rp10.000 |
+| `six-monthly` | Auto-renewing | 6 bulan | Rp50.000 |
 
-3. Buat satu offer pada setiap base plan:
-
-| Offer ID | Base plan | Fase diskon | Setelah fase diskon |
-| --- | --- | --- | --- |
-| `first-month-half` | `monthly` | 1 siklus bulanan, diskon 50% (Rp10.000) | Rp20.000/bulan |
-| `first-six-months-half` | `six-monthly` | 1 siklus enam bulanan, diskon 50% (Rp50.000) | Rp100.000/6 bulan |
-
-4. Eligibility offer: **New customer acquisition > Never had any subscription
-   in this app**. Aktifkan base plan dan offer. Server juga memeriksa riwayat
-   VIP akun Jajanku; pengguna harus lolos kedua pemeriksaan. Jangan gunakan
-   offer developer-determined untuk konfigurasi ini.
-5. Unggah AAB prod ke **Internal testing**, tambahkan penguji, dan daftarkan akun
+3. Aktifkan base plan. Untuk katalog baru, pembelian memakai harga normal tanpa
+   offer otomatis. Voucher Firestore disimpan terpisah dan belum diterapkan ke Play.
+4. Unggah AAB prod ke **Internal testing**, tambahkan penguji, dan daftarkan akun
    uji di **Settings > License testing**. Instal melalui tautan testing Play.
-   Untuk menguji flavor dev, buat aplikasi Play terpisah dengan package
-   `com.jajanku.app.dev` dan konfigurasi produk yang sama.
+   Untuk flavor dev, gunakan aplikasi Play terpisah dengan package `com.jajanku.app.dev`.
 
 Harga yang dapat dibeli selalu berasal dari Google Play. Ubah harga base plan dan
 harga offer melalui Play Console; aplikasi menampilkan harga terbaru yang dikembalikan Play.
 Tidak perlu mengubah kode atau mengisi harga duplikat di Firestore.
 
-## Katalog paket di luar users
+## Katalog paket dan voucher
 
-Koleksi **subscriptions** menyimpan satu dokumen per base plan. Aplikasi mengambil
-katalog melalui `preparePremiumPurchase`; hanya Console/Admin SDK yang dapat mengubahnya.
-Seed awal (ADC diperlukan; tanpa `--apply` hanya menampilkan rencana):
-
-```powershell
-node functions/scripts/seed-subscriptions.js --project jajanku-dev-25ae6
-node functions/scripts/seed-subscriptions.js --project jajanku-dev-25ae6 --apply
-# Jalankan juga untuk jajanku-26976 saat siap dipakai di prod.
-```
-
-Contoh dokumen `subscriptions/monthly`:
+Koleksi `subscriptions` memakai ID base plan Google Play. Contoh `monthly`:
 
 ```json
-{
-  "title": "1 bulan",
-  "billingPeriod": "P1M",
-  "offerId": "first-month-half",
-  "discountPercent": 50,
-  "enabled": true,
-  "sortOrder": 1
-}
+{"title":"1 bulan","billingPeriod":"P1M","price":10000,"currency":"IDR","durationDays":30,"enabled":true,"sortOrder":1}
 ```
 
-ID dokumen harus sama dengan base plan ID di Play (`monthly`, `six-monthly`, atau
-base plan baru). `billingPeriod` menggunakan periode ISO dari Play, misalnya P1M,
-P6M, P1Y. `title` menjadi label durasi pada kartu dan penjelasan perpanjangan.
-`offerId` boleh null untuk paket tanpa diskon; `discountPercent` harus sesuai
-harga offer di Play. Offer yang didukung: satu periode diskon lalu harga normal.
-`enabled: false` menyembunyikan paket dari pembelian baru. Jangan hapus dokumen
-atau mengganti offer ID yang masih dipakai pelanggan: verifikasi renewal tetap
-membutuhkan katalog tersebut. Untuk offer berbeda, gunakan base plan baru.
+`six-monthly` memakai `price: 50000`, `durationDays: 180`, `billingPeriod: "P6M"`.
+`offerId` dan `discountPercent` sudah dihapus dari katalog. `price` adalah harga
+katalog dalam rupiah yang dapat diedit admin. Harga pembayaran Google Play tetap
+harus disesuaikan di Play Console. `durationDays` menyimpan durasi katalog;
+tanggal akses pembelian Play tetap berasal dari periode terverifikasi Google,
+karena satu bulan kalender tidak selalu 30 hari.
 
-Tambahkan base plan di Play dan dokumen di Firestore untuk menambah paket tanpa
-rilis ulang. Ketuk **Muat ulang paket** untuk mengambil konfigurasi terbaru.
-Product ID tetap `jajanku_premium`. Koleksi ini adalah katalog, sedangkan status
-akses user tetap merupakan hasil verifikasi Google dan tidak ditentukan oleh harga.
+Koleksi `vouchers`, dokumen `cobapremium`:
+
+| Field | Nilai awal |
+| --- | --- |
+| name | cobapremium |
+| type | percentage |
+| price | 75 |
+| eligibleUntil | Timestamp 2 Januari 2027 00:00 WIB (batas eksklusif) |
+| enabled | true |
+| title | Cobain Premium |
+| userStatus | free |
+| subscriptionId | null (semua paket) |
+
+Voucher berlaku sampai akhir 1 Januari 2027 WIB. `type` mendukung `percentage`
+(potongan persen, maksimal 100) dan `absolute` (potongan rupiah). Potongan dibatasi
+agar total tidak negatif. `userStatus` mendukung free, subscriber, exsubscriber;
+`subscriptionId` berisi ID dokumen paket atau null. Callable `previewPremiumVoucher`
+menerima `name` dan `subscriptionId`, memvalidasi akun, masa berlaku dan paket,
+lalu mengembalikan perhitungan beserta `title`. Ini baru preview katalog:
+`checkoutSupported: false`. Voucher database belum terhubung ke checkout Google Play;
+aplikasi tidak mengiklankan diskon otomatis dari katalog ini.
+
+Field `users.userStatus` mengikuti aturan:
+- `hasEverBeenPremium` bukan true: free.
+- `hasEverBeenPremium: true` dan `plan: premium`: subscriber.
+- `hasEverBeenPremium: true` dan `plan: free`: exsubscriber.
+
+Trigger `syncUserStatus` menyinkronkan field setelah perubahan profil. Status ini
+merupakan klasifikasi, bukan sumber hak akses. `PremiumStartedAt` dan
+`PremiumEndedAt` tetap divalidasi oleh server/client; lifetime tetap pengecualian.
+Setelah lewat tanggal akhir, akses langsung berakhir di client, sementara status
+tersimpan mengikuti pembaruan plan dari sinkronisasi billing.
+
+Migrasi project lama (ADC, tanpa `--apply` hanya dry-run):
+
+```powershell
+node functions/scripts/migrate-catalog.js --project jajanku-26976 --apply
+```
+
+Migrasi mengatur ulang harga/durasi dua paket sesuai nilai awal di atas, menghapus
+field diskon lama, membuat voucher jika belum ada, dan mengisi status semua user.
+Jangan menjalankan ulang setelah mengubah harga jika ingin mempertahankan harga baru.
+Deploy rules sebelum memakai aplikasi yang menambahkan `userStatus` saat registrasi.
+Deploy Functions untuk mengaktifkan trigger dan preview voucher.
 
 ## Firebase / Google Cloud
 

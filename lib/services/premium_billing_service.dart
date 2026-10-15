@@ -15,21 +15,21 @@ class SubscriptionPlan {
     required this.id,
     required this.title,
     required this.billingPeriod,
-    this.offerId,
-    this.discountPercent = 0,
+    this.price = 0,
+    this.durationDays = 0,
   });
   final String id;
   final String title;
   final String billingPeriod;
-  final String? offerId;
-  final int discountPercent;
+  final int price;
+  final int durationDays;
   factory SubscriptionPlan.fromMap(Map<dynamic, dynamic> data) =>
       SubscriptionPlan(
         id: data['id'] as String,
         title: data['title'] as String,
         billingPeriod: data['billingPeriod'] as String,
-        offerId: data['offerId'] as String?,
-        discountPercent: (data['discountPercent'] as num?)?.toInt() ?? 0,
+        price: (data['price'] as num?)?.toInt() ?? 0,
+        durationDays: (data['durationDays'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -47,20 +47,8 @@ class PremiumBillingService extends ChangeNotifier {
   static final instance = PremiumBillingService._();
   static const productId = 'jajanku_premium';
   static const defaultPlans = [
-    SubscriptionPlan(
-      id: 'monthly',
-      title: '1 bulan',
-      billingPeriod: 'P1M',
-      offerId: 'first-month-half',
-      discountPercent: 50,
-    ),
-    SubscriptionPlan(
-      id: 'six-monthly',
-      title: '6 bulan',
-      billingPeriod: 'P6M',
-      offerId: 'first-six-months-half',
-      discountPercent: 50,
-    ),
+    SubscriptionPlan(id: 'monthly', title: '1 bulan', billingPeriod: 'P1M'),
+    SubscriptionPlan(id: 'six-monthly', title: '6 bulan', billingPeriod: 'P6M'),
   ];
   List<SubscriptionPlan> plans = [];
 
@@ -127,7 +115,6 @@ class PremiumBillingService extends ChangeNotifier {
       final matches = plans.where((p) => p.id == details.basePlanId);
       if (matches.isEmpty) continue;
       final plan = matches.first;
-      final introId = plan.offerId;
       final phases = details.pricingPhases;
       final period = plan.billingPeriod;
       if (phases.isEmpty ||
@@ -135,21 +122,8 @@ class PremiumBillingService extends ChangeNotifier {
           phases.last.recurrenceMode != RecurrenceMode.infiniteRecurring) {
         continue;
       }
-      if (details.offerId == null) {
-        if (phases.length != 1) continue;
-      } else {
-        if (!eligibleForIntro ||
-            details.offerId != introId ||
-            phases.length != 2 ||
-            phases.first.billingPeriod != period ||
-            phases.first.billingCycleCount != 1 ||
-            phases.first.recurrenceMode != RecurrenceMode.finiteRecurring ||
-            phases.first.priceCurrencyCode != phases.last.priceCurrencyCode ||
-            phases.first.priceAmountMicros * 100 !=
-                phases.last.priceAmountMicros * (100 - plan.discountPercent)) {
-          continue;
-        }
-      }
+      // Database vouchers are not Google Play offer tokens.
+      if (details.offerId != null || phases.length != 1) continue;
       if (result[details.basePlanId]?.discounted != true) {
         result[details.basePlanId] = PremiumOffer(product, details);
       }

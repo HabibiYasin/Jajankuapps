@@ -7,8 +7,8 @@ const index = args.indexOf('--project');
 const projectId = index < 0 ? null : args[index + 1];
 if (!projectId || projectId.startsWith('--')) throw new Error('--project PROJECT_ID is required');
 const plans = [
-  {id: 'monthly', title: '1 bulan', billingPeriod: 'P1M', offerId: 'first-month-half', discountPercent: 50, enabled: true, sortOrder: 1},
-  {id: 'six-monthly', title: '6 bulan', billingPeriod: 'P6M', offerId: 'first-six-months-half', discountPercent: 50, enabled: true, sortOrder: 2},
+  {id: 'monthly', title: '1 bulan', billingPeriod: 'P1M', price: 10000, currency: 'IDR', durationDays: 30, enabled: true, sortOrder: 1},
+  {id: 'six-monthly', title: '6 bulan', billingPeriod: 'P6M', price: 50000, currency: 'IDR', durationDays: 180, enabled: true, sortOrder: 2},
 ];
 initializeApp({credential: applicationDefault(), projectId});
 const db = getFirestore();

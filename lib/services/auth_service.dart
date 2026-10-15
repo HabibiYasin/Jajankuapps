@@ -90,6 +90,7 @@ class AuthService {
         if (!snapshot.exists) 'PremiumStartedAt': null,
         if (!snapshot.exists) 'PremiumEndedAt': null,
         if (!snapshot.exists) 'hasEverBeenPremium': false,
+        if (!snapshot.exists) 'userStatus': 'free',
         if (!snapshot.exists) 'premiumLifetime': false,
       }, SetOptions(merge: true));
     });

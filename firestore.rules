@@ -35,15 +35,19 @@ service cloud.firestore {
     match /subscriptions/{planId} {
       allow read, write: if false;
     }
+    match /vouchers/{voucherId} {
+      allow read, write: if false;
+    }
     match /users/{uid} {
       allow get, delete: if owns(uid);
       allow create: if owns(uid)
         && request.resource.data.keys().hasAll(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt'])
-        && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt', 'avatarCode', 'PremiumStartedAt', 'PremiumEndedAt', 'hasEverBeenPremium', 'premiumLifetime'])
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'providers', 'plan', 'createdAt', 'lastLoginAt', 'installedAt', 'lastOpenedAt', 'deletedAt', 'avatarCode', 'PremiumStartedAt', 'PremiumEndedAt', 'hasEverBeenPremium', 'premiumLifetime', 'userStatus'])
         && request.resource.data.get('PremiumStartedAt', null) == null
         && request.resource.data.get('PremiumEndedAt', null) == null
         && request.resource.data.get('hasEverBeenPremium', false) == false
         && request.resource.data.get('premiumLifetime', false) == false
+        && request.resource.data.get('userStatus', 'free') == 'free'
         && validActivity()
         && validAvatar()
         && request.resource.data.plan == 'free'
