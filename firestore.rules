@@ -32,6 +32,11 @@ service cloud.firestore {
         || (d.avatarCode is int && d.avatarCode >= 1 && d.avatarCode <= 6);
     }
     // Catalog is managed through Firebase Console / Admin SDK only.
+    // Public version policy includes Guest installs; only admins can change it.
+    match /app_config/android_update {
+      allow get: if true;
+      allow list, write: if false;
+    }
     match /subscriptions/{planId} {
       allow read, write: if false;
     }

@@ -3,79 +3,55 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_1/services/tutorial_schedule.dart';
 
 void main() {
-  late SharedPreferences preferences;
-  final createdAt = DateTime(2026, 10, 14, 23, 50);
-
+  late SharedPreferences prefs;
+  final start = DateTime(2026, 10, 20, 12);
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    preferences = await SharedPreferences.getInstance();
+    prefs = await SharedPreferences.getInstance();
   });
-
-  bool shouldShow(DateTime now, {String uid = 'new-user'}) =>
+  bool eligible(DateTime now, {String uid = 'user'}) =>
       TutorialSchedule.shouldShow(
-        preferences,
+        prefs,
         uid: uid,
-        createdAt: createdAt,
+        createdAt: DateTime(2020),
         now: now,
       );
-
-  test('Shows once per calendar day for the first three days only', () async {
-    for (var day = 14; day <= 16; day++) {
-      final now = DateTime(2026, 10, day, 23, 55);
-      expect(shouldShow(now), isTrue);
-      await TutorialSchedule.recordShown(
-        preferences,
-        uid: 'new-user',
-        now: now,
+  Future<bool> record(DateTime now) =>
+      TutorialSchedule.recordShown(prefs, uid: 'user', now: now);
+  test(
+    'Three appearances daily for five calendar days from first appearance',
+    () async {
+      for (var day = 0; day < 5; day++) {
+        final now = start.add(Duration(days: day));
+        for (var appearance = 0; appearance < 3; appearance++) {
+          expect(eligible(now), isTrue);
+          await record(now);
+        }
+        expect(eligible(now), isFalse);
+      }
+      expect(eligible(start.add(const Duration(days: 5))), isFalse);
+    },
+  );
+  test(
+    'Hide today resets at midnight; forever persists; accounts are isolated',
+    () async {
+      await record(start);
+      await prefs.setString(
+        'tutorial_hidden_date_user',
+        start.toIso8601String(),
       );
-      expect(shouldShow(DateTime(2026, 10, day, 23, 59)), isFalse);
-    }
-    expect(shouldShow(DateTime(2026, 10, 17)), isFalse);
-    expect(shouldShow(DateTime(2027, 1, 1)), isFalse);
+      expect(eligible(start), isFalse);
+      expect(eligible(start.add(const Duration(days: 1))), isTrue);
+      await prefs.setBool('tutorial_disabled_user', true);
+      expect(eligible(start.add(const Duration(days: 1))), isFalse);
+      expect(eligible(start, uid: 'other'), isTrue);
+    },
+  );
+  test('Old dismissals respected and malformed dates tolerated', () async {
+    await prefs.setString('tutorial_hidden_date', start.toIso8601String());
+    expect(eligible(start), isFalse);
+    await prefs.setString('tutorial_hidden_date', 'invalid');
+    await prefs.setString('tutorial_last_shown_at_user', 'invalid');
+    expect(eligible(start), isTrue);
   });
-
-  test(
-    'A new calendar day is eligible even less than 24 hours later',
-    () async {
-      await TutorialSchedule.recordShown(
-        preferences,
-        uid: 'new-user',
-        now: createdAt,
-      );
-      expect(shouldShow(DateTime(2026, 10, 15, 0, 1)), isTrue);
-    },
-  );
-
-  test(
-    'History survives reopening preferences and is separate per account',
-    () async {
-      await TutorialSchedule.recordShown(
-        preferences,
-        uid: 'new-user',
-        now: createdAt,
-      );
-      preferences = await SharedPreferences.getInstance();
-      expect(shouldShow(createdAt), isFalse);
-      expect(shouldShow(createdAt, uid: 'other-user'), isTrue);
-    },
-  );
-
-  test('An older account gets no popup even without saved history', () {
-    expect(shouldShow(DateTime(2026, 10, 20)), isFalse);
-    expect(shouldShow(DateTime(2026, 10, 13)), isFalse);
-  });
-
-  test(
-    'Respects a dismissal from the old version and ignores malformed dates',
-    () async {
-      await preferences.setString(
-        'tutorial_hidden_date',
-        createdAt.toIso8601String(),
-      );
-      expect(shouldShow(createdAt), isFalse);
-      await preferences.setString('tutorial_hidden_date', 'invalid');
-      await preferences.setString('tutorial_last_shown_at_new-user', 'invalid');
-      expect(shouldShow(createdAt), isTrue);
-    },
-  );
 }

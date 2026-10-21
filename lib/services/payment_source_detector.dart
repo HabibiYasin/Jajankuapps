@@ -60,6 +60,26 @@ class PaymentSourceDetector {
       }
     }
 
+    // Shared receipts may lose the bank logo during OCR. Only use the payer's
+    // explicitly labelled PAN, never a merchant PAN or an unlabelled number.
+    // BCA Syariah issuer code: https://bicara131.bi.go.id/knowledgebase/article/KA-01154/en-us
+    final customerPan = RegExp(
+      r'^customer\s+pan\b\s*[:\-]?\s*(.*)$',
+      caseSensitive: false,
+    );
+    for (var i = 0; i < lines.length; i++) {
+      final field = customerPan.firstMatch(lines[i]);
+      if (field == null) continue;
+      final inline = field.group(1)!.trim();
+      final value = inline.isNotEmpty
+          ? inline
+          : (i + 1 < lines.length ? lines[i + 1] : '');
+      final compact = value.replaceAll(RegExp(r'[\s-]'), '');
+      if (RegExp(r'^93600536[0-9*xX•]{4,11}$').hasMatch(compact)) {
+        return 'BCA Syariah';
+      }
+    }
+
     var inDestination = false;
     String? candidate;
     for (final line in lines) {

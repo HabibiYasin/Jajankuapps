@@ -3,6 +3,44 @@ import 'package:flutter_application_1/services/parsers/bca_syariah_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  for (final pan in [
+    'Customer PAN: 9360053612345678901',
+    'Customer PAN\n9360053612345678901',
+    'Customer PAN 9360 0536 1234 5678 901',
+    'Customer PAN 93600536*******8901',
+  ]) {
+    test('missing logo uses labelled payer PAN: $pan', () {
+      final tx = QrisParser.parseReceipt(
+        'Transaksi Berhasil\nQRIS\nSumber Dana BUDI 123***456\nTujuan TOKO MAJU\n$pan\nTotal Transaksi Rp25000',
+      );
+      expect(tx.source, 'BCA Syariah');
+      expect(tx.numericNominal, 25000);
+      expect(tx.merchant, 'TOKO MAJU');
+    });
+  }
+  for (final field in [
+    'Merchant PAN 9360053612345678901',
+    'No Referensi 9360053612345678901',
+    '9360053612345678901',
+    'Customer PAN\nMerchant PAN 9360053612345678901',
+    'Customer PAN 93600536',
+    'Customer PAN 9360000912345678901',
+  ]) {
+    test(
+      'does not infer payer from another field or incomplete PAN: $field',
+      () {
+        final tx = QrisParser.parseReceipt('QRIS\n$field\nTotal Rp25000');
+        expect(tx.source, 'Tidak Diketahui');
+      },
+    );
+  }
+  test('explicit source still wins over PAN fallback', () {
+    final tx = QrisParser.parseReceipt(
+      'QRIS\nSumber Dana: BCA\nCustomer PAN 9360053612345678901\nTotal Rp25000',
+    );
+    expect(tx.source, 'BCA');
+  });
+
   const receipt = '''
 Transaksi Berhasil
 Sumber Dana BUDI SANTOSO 123***456

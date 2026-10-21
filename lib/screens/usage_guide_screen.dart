@@ -368,7 +368,7 @@ class UsageGuideScreen extends StatelessWidget {
             child: ListTile(
               title: const Text('Cara Catat'),
               subtitle: const Text(
-                'Lihat tutorial mencatat dari bukti pembayaran',
+                'Tutorial manual interaktif dan panduan tambah otomatis',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => showTutorialDialog(context),

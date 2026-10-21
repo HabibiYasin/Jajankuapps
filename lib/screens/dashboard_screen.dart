@@ -64,10 +64,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       uid: user.uid,
       now: now,
     );
-    if (!saved || !mounted || AuthService.instance.currentUser?.uid != user.uid) {
+    if (!saved ||
+        !mounted ||
+        AuthService.instance.currentUser?.uid != user.uid) {
       return;
     }
-    await showTutorialDialog(context);
+    await showTutorialDialog(context, allowHideToday: true);
   }
 
   double _calculateTotal(DateTime period, {bool monthly = false}) =>

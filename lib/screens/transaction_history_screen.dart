@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/transaction_model.dart';
 import '../models/plan_access.dart';
 import '../services/transaction_classifier.dart';
+import '../services/manual_tour.dart';
 import '../services/export_service.dart';
 import '../models/budget_limits.dart';
 import '../services/monthly_report_service.dart';
@@ -323,6 +324,10 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     TransactionModel tx,
     StateSetter setModalState,
   ) {
+    final tour = ManualTour.instance;
+    final tutorial = identical(tx, tour.example);
+    if (tutorial) tour.go(ManualTourStep.editing);
+    bool startedTyping = false;
     final merchantController = TextEditingController(text: tx.merchant);
     final sourceController = TextEditingController(text: tx.source);
     String selectedCategory = tx.category;
@@ -336,9 +341,30 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       selectedCategory = availableCategories.last;
     }
 
-    showDialog(
+    final editRoute = DialogRoute<void>(
       context: context,
       builder: (context) {
+        if (tutorial && !startedTyping) {
+          startedTyping = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!await tour.type(
+              merchantController,
+              'Makan siang di warung (contoh)',
+              () => context.mounted,
+            )) {
+              return;
+            }
+            tour.focusField('editSource');
+            if (!await tour.type(
+              sourceController,
+              'Dompet tunai',
+              () => context.mounted,
+            )) {
+              return;
+            }
+            tour.go(ManualTourStep.saveEdit);
+          });
+        }
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
@@ -360,6 +386,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     ),
                     const SizedBox(height: 4),
                     TextField(
+                      key: tutorial ? tour.key('editName') : null,
                       controller: merchantController,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
@@ -377,6 +404,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     ),
                     const SizedBox(height: 4),
                     TextField(
+                      key: tutorial ? tour.key('editSource') : null,
                       controller: sourceController,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
@@ -447,6 +475,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   ),
                 ),
                 ElevatedButton(
+                  key: tutorial ? tour.key('saveEdit') : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal,
                     foregroundColor: Colors.white,
@@ -470,10 +499,26 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         );
       },
     );
+    Navigator.of(context).push(editRoute).whenComplete(() {
+      if (tutorial &&
+          [
+            ManualTourStep.editing,
+            ManualTourStep.saveEdit,
+          ].contains(tour.step)) {
+        tour.cancel();
+      }
+    });
+    editRoute.completed.then((_) {
+      merchantController.dispose();
+      sourceController.dispose();
+    });
   }
 
   void _showTransactionDetailModal(BuildContext context, int index) {
     final tx = widget.history[index];
+    final tour = ManualTour.instance;
+    final tutorial = identical(tx, tour.example);
+    if (tutorial) tour.go(ManualTourStep.edit);
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -569,6 +614,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
+                            key: tutorial ? tour.key('edit') : null,
                             icon: const Icon(Icons.edit, size: 16),
                             label: const Text('Edit Detail'),
                             style: ElevatedButton.styleFrom(
@@ -589,6 +635,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
+                        key: tutorial ? tour.key('delete') : null,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: const BorderSide(color: Colors.red),
@@ -608,7 +655,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      if (tutorial && tour.active) tour.stop();
+    });
   }
 
   @override
@@ -950,6 +999,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     final originalIndex = widget.history.indexOf(tx);
 
                     return Card(
+                      key: identical(tx, ManualTour.instance.example)
+                          ? ManualTour.instance.key('transaction')
+                          : null,
                       margin: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
                         onTap: () =>

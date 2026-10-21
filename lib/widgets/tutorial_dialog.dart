@@ -1,111 +1,77 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/manual_tour.dart';
+import '../screens/automatic_tutorial_screen.dart';
+import '../services/auth_service.dart';
+
 Future<void> showTutorialDialog(
   BuildContext context, {
   bool allowHideToday = false,
-}) {
-  final screen = MediaQuery.sizeOf(context);
-
-  return showDialog<void>(
+}) async {
+  final uid = AuthService.instance.currentUser?.uid ?? 'guest';
+  final manual = await showDialog<bool>(
     context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return Dialog(
-        insetPadding: const EdgeInsets.all(12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: SizedBox(
-          width: screen.width,
-          height: screen.height * 0.9,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Cara Catat',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Tutup',
-                      onPressed: () => Navigator.pop(dialogContext),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: ColoredBox(
-                      color: Colors.grey.shade100,
-                      child: Center(
-                        child: InteractiveViewer(
-                          minScale: 1,
-                          maxScale: 4,
-                          child: Image.asset(
-                            'assets/icon/tutorial.png',
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Padding(
-                                padding: EdgeInsets.all(20),
-                                child: Text(
-                                  'Gambar tutorial.png tidak ditemukan di assets/icon/',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (allowHideToday)
-                  TextButton(
-                    onPressed: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString(
-                        'tutorial_hidden_date',
-                        DateTime.now().toIso8601String(),
-                      );
-                      if (!dialogContext.mounted) return;
-                      Navigator.pop(dialogContext);
-                    },
-                    child: const Text(
-                      'Jangan tunjukkan hari ini',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('Mengerti / Tutup'),
-                  ),
-                ),
-              ],
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Mau belajar cara catat?'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: const Text('Cara tambah manual'),
+              subtitle: const Text(
+                'Panduan langsung menambah, mengedit, dan menghapus',
+              ),
+              onTap: () => Navigator.pop(dialogContext, true),
             ),
-          ),
+            ListTile(
+              leading: const Icon(Icons.play_circle_outline),
+              title: const Text('Cara tambah otomatis'),
+              subtitle: const Text(
+                'Tonton video panduan mencatat dari bukti pembayaran',
+              ),
+              onTap: () => Navigator.pop(dialogContext, false),
+            ),
+            if (allowHideToday) ...[
+              TextButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString(
+                    'tutorial_hidden_date_$uid',
+                    DateTime.now().toIso8601String(),
+                  );
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                },
+                child: const Text('Matikan hari ini'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('tutorial_disabled_$uid', true);
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                },
+                child: const Text('Matikan selamanya'),
+              ),
+            ],
+          ],
         ),
-      );
-    },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Tutup'),
+        ),
+      ],
+    ),
   );
+  if (!context.mounted) return;
+  if (manual == true) {
+    ManualTour.instance.start(context);
+  } else if (manual == false) {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const AutomaticTutorialScreen()),
+    );
+  }
 }

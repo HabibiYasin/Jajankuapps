@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../services/manual_tour.dart';
 
 class ExpenseFloatingMenu extends StatefulWidget {
   final Future<void> Function()? onIncomeEntry;
@@ -40,6 +41,9 @@ class _ExpenseFloatingMenuState extends State<ExpenseFloatingMenu> {
           opacity: _isOpen ? 1 : 0,
           duration: const Duration(milliseconds: 180),
           child: FloatingActionButton.small(
+            key: label == 'Catat Manual'
+                ? ManualTour.instance.key('manual')
+                : null,
             heroTag: label,
             tooltip: label,
             backgroundColor: Theme.of(context).colorScheme.surface,
@@ -91,11 +95,19 @@ class _ExpenseFloatingMenuState extends State<ExpenseFloatingMenu> {
             right: 0,
             bottom: 0,
             child: FloatingActionButton(
+              key: ManualTour.instance.key('add'),
               heroTag: 'expense-menu',
               tooltip: _isOpen ? 'Tutup menu pengeluaran' : 'Catat Pengeluaran',
               backgroundColor: AppColors.pink,
               foregroundColor: Colors.white,
-              onPressed: () => setState(() => _isOpen = !_isOpen),
+              onPressed: () {
+                setState(() => _isOpen = !_isOpen);
+                if (ManualTour.instance.active) {
+                  ManualTour.instance.go(
+                    _isOpen ? ManualTourStep.menu : ManualTourStep.add,
+                  );
+                }
+              },
               child: AnimatedRotation(
                 turns: _isOpen ? 0.125 : 0,
                 duration: const Duration(milliseconds: 220),

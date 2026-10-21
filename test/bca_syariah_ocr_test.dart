@@ -52,6 +52,19 @@ void main() {
         ],
       });
 
+      // Simulate the logo disappearing while retaining the actual spatial rows.
+      final withoutLogo = OcrService.extractSpatialText(recognized)
+          .split('\n')
+          .where(
+            (line) =>
+                !RegExp(r'bca|8cas|syar', caseSensitive: false).hasMatch(line),
+          )
+          .join('\n');
+      final fallback = QrisParser.parseReceipt(withoutLogo);
+      expect(fallback.source, 'BCA Syariah');
+      expect(fallback.merchant, receipt.merchant);
+      expect(fallback.numericNominal, receipt.amount);
+
       final text = OcrService.extractSpatialText(recognized);
       final transaction = QrisParser.parseReceipt(text);
       expect(transaction.source, 'BCA Syariah');

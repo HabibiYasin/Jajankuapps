@@ -35,6 +35,21 @@ async function query(uid, owner, expected) {
   assert.equal(result.status, expected, await result.text()); checks++;
 }
 (async () => {
+  const updatePath = 'app_config/android_update';
+  const updatePolicy = {enabled:{booleanValue:true},minimumBuildNumber:{integerValue:'4'}};
+  // Seed only the local emulator as admin, then exercise public/client access.
+  const seeded = await fetch(`${base}/${updatePath}`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json', Authorization:'Bearer owner'},
+    body: JSON.stringify({fields:updatePolicy}),
+  });
+  assert.equal(seeded.status, 200, await seeded.text());
+  await request('GET', updatePath, null);
+  await request('GET', updatePath, 'alice');
+  await request('PATCH', updatePath, null, updatePolicy, 403);
+  await request('PATCH', updatePath, 'alice', updatePolicy, 403);
+  await request('DELETE', updatePath, 'alice', undefined, 403);
+  await request('GET', 'app_config', null, undefined, 403);
+  await request('GET', 'app_config/private', 'alice', undefined, 403);
   async function profileWrite(uid, plan, create = false, extra = {}) {
     const result = await fetch(`${base}:commit`, {
       method: 'POST', headers: {'Content-Type':'application/json', Authorization:`Bearer ${token(uid)}`},

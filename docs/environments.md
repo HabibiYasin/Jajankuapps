@@ -123,6 +123,10 @@ Unduh ulang JSON prod bila diperlukan dan uji melalui internal testing Play.
 
 ## Pemeriksaan sebelum rilis
 
+Pengaturan versi minimum dan aktivasi wajib update Android dijelaskan di
+[force-update.md](force-update.md). Aktifkan hanya setelah update tersedia
+untuk semua pengguna sasaran di Google Play.
+
 Konfigurasi paket premium, diskon pertama, service account, dan notifikasi Google
 Play dijelaskan di [premium-google-play.md](premium-google-play.md). Billing dev
 memakai `com.jajanku.app.dev`; billing prod memakai `com.jajanku.app`.

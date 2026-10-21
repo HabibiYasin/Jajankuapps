@@ -3,10 +3,16 @@ import 'package:flutter/services.dart';
 
 import '../models/transaction_model.dart';
 import '../services/transaction_classifier.dart';
+import '../services/manual_tour.dart';
 
 class ManualExpenseScreen extends StatefulWidget {
   final bool isIncome;
-  const ManualExpenseScreen({super.key, this.isIncome = false});
+  final bool tutorial;
+  const ManualExpenseScreen({
+    super.key,
+    this.isIncome = false,
+    this.tutorial = false,
+  });
 
   @override
   State<ManualExpenseScreen> createState() => _ManualExpenseScreenState();
@@ -25,10 +31,39 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
   void initState() {
     super.initState();
     if (widget.isIncome) _category = 'Gaji';
+    if (widget.tutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fillExample());
+    }
+  }
+
+  Future<void> _fillExample() async {
+    final tour = ManualTour.instance;
+    if (!mounted || !tour.active) return;
+    tour.go(ManualTourStep.filling);
+    if (!await tour.type(_merchant, 'Makan siang (contoh)', () => mounted)) {
+      return;
+    }
+    tour.focusField('amount');
+    if (!await tour.type(_amount, '25000', () => mounted)) return;
+    if (!mounted || !tour.active) return;
+    setState(() => _category = 'Makanan');
+    tour.focusField('source');
+    if (!await tour.type(_source, 'Tunai', () => mounted)) return;
+    tour.go(ManualTourStep.save);
   }
 
   @override
   void dispose() {
+    if (widget.tutorial &&
+        [
+          ManualTourStep.filling,
+          ManualTourStep.save,
+          ManualTourStep.menu,
+        ].contains(ManualTour.instance.step)) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => ManualTour.instance.stop(),
+      );
+    }
     _merchant.dispose();
     _amount.dispose();
     _source.dispose();
@@ -57,6 +92,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
   void _save() {
     if (!_formKey.currentState!.validate()) return;
     final amount = double.parse(_amount.text);
+    if (widget.tutorial) ManualTour.instance.go(ManualTourStep.history);
     Navigator.pop(
       context,
       TransactionModel(
@@ -84,6 +120,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             TextFormField(
+              key: widget.tutorial ? ManualTour.instance.key('merchant') : null,
               controller: _merchant,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
@@ -102,6 +139,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
             ),
             const SizedBox(height: 16),
             TextFormField(
+              key: widget.tutorial ? ManualTour.instance.key('amount') : null,
               controller: _amount,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -119,6 +157,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
+              key: ValueKey(_category),
               initialValue: _category,
               decoration: const InputDecoration(labelText: 'Kategori'),
               items:
@@ -150,6 +189,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
             ),
             const SizedBox(height: 16),
             TextFormField(
+              key: widget.tutorial ? ManualTour.instance.key('source') : null,
               controller: _source,
               maxLength: 200,
               decoration: InputDecoration(
@@ -173,6 +213,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
+              key: widget.tutorial ? ManualTour.instance.key('save') : null,
               onPressed: _save,
               icon: const Icon(Icons.save_outlined),
               label: Text(

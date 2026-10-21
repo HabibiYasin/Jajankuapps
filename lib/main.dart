@@ -16,6 +16,9 @@ import 'services/profile_plan_store.dart';
 import 'services/premium_billing_service.dart';
 import 'services/auth_service.dart';
 import 'services/app_activity_service.dart';
+import 'services/manual_tour.dart';
+import 'services/app_update_service.dart';
+import 'widgets/app_update_gate.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -120,6 +123,13 @@ class _JajankuAppState extends State<JajankuApp> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
+      builder: (context, child) => AppUpdateGate(
+        packageName: appFlavor == 'dev'
+            ? 'com.jajanku.app.dev'
+            : 'com.jajanku.app',
+        checkForUpdate: () => AppUpdateService.checkCurrent(widget.preferences),
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: QrisTrackerApp(onToggleTheme: _toggleTheme),
       debugShowCheckedModeBanner: false,
     );
@@ -155,9 +165,21 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   late StreamSubscription _intentDataStreamSubscription;
 
+  final _tour = ManualTour.instance;
+  final _tutorialExamples = <TransactionModel>{};
+  void _refreshTour() {
+    if (mounted) setState(() {});
+  }
+
+  void _startTour() {
+    if (mounted) setState(() => _selectedIndex = 0);
+  }
+
   @override
   void initState() {
     super.initState();
+    _tour.onStart = _startTour;
+    _tour.addListener(_refreshTour);
     WidgetsBinding.instance.addObserver(this);
     PremiumBillingService.instance.start();
     _accountData.addListener(_applyAccountData);
@@ -192,6 +214,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   @override
   void dispose() {
+    _tour.removeListener(_refreshTour);
+    _tour.onStart = null;
+    _tour.stop();
     WidgetsBinding.instance.removeObserver(this);
     _accountData.removeListener(_applyAccountData);
     _planSubscription?.cancel();
@@ -381,13 +406,25 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   Future<void> _recordManualExpense({bool isIncome = false}) async {
     if (!await requireLogin(context) || !mounted) return;
     if (!await _awaitBudgetSetup() || !mounted) return;
+    final tutorial = _tour.active && !isIncome;
     final owner = _accountData.uid;
     final tx = await Navigator.of(context).push<TransactionModel>(
       MaterialPageRoute(
-        builder: (_) => ManualExpenseScreen(isIncome: isIncome),
+        builder: (_) => ManualExpenseScreen(
+          isIncome: isIncome,
+          tutorial: _tour.active && !isIncome,
+        ),
       ),
     );
     if (tx == null || !mounted || owner != _accountData.uid) return;
+    if (tutorial) {
+      if (_tour.active) {
+        _tutorialExamples.add(tx);
+        _tour.example = tx;
+        _tour.go(ManualTourStep.history);
+      }
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       await _accountData.insert(tx, expectedUid: owner);
@@ -567,18 +604,44 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
           ),
           TransactionHistoryScreen(
             isPremium: _isPremium,
-            key: ValueKey('history-${_accountData.uid}'),
-            history: _transactionHistory,
+            key: ValueKey('history-${_accountData.uid}-${_tour.active}'),
+            history: [
+              if (_tour.example != null) _tour.example!,
+              ..._transactionHistory,
+            ],
             importRevision: _accountData.transactionRevision,
             onImportTransactions: _sheetImporter(_accountData.uid),
             budgetLimits: _accountData.limits,
             userName:
                 AuthService.instance.currentUser?.displayName ?? _userName,
-            onDelete: (tx) => _performEdit(() => _accountData.delete(tx)),
-            onUpdateDate: (tx, newDate) =>
-                _performEdit(() => _accountData.updateDate(tx, newDate)),
-            onUpdateTransaction: (tx) =>
-                _performEdit(() => _accountData.updateDetails(tx)),
+            onDelete: (tx) async {
+              if (_tutorialExamples.contains(tx)) {
+                _tour.stop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Selesai! Kamu sudah belajar tambah, edit, dan hapus.',
+                    ),
+                  ),
+                );
+                return;
+              }
+              return _performEdit(() => _accountData.delete(tx));
+            },
+            onUpdateDate: (tx, newDate) async {
+              if (_tutorialExamples.contains(tx)) {
+                tx.dateTime = newDate;
+                return;
+              }
+              return _performEdit(() => _accountData.updateDate(tx, newDate));
+            },
+            onUpdateTransaction: (tx) async {
+              if (_tutorialExamples.contains(tx)) {
+                _tour.go(ManualTourStep.delete);
+                return;
+              }
+              return _performEdit(() => _accountData.updateDetails(tx));
+            },
           ),
           IncomeScreen(
             isPremium: _isPremium,
@@ -602,6 +665,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       ),
       floatingActionButton: _selectedIndex == 0
           ? ExpenseFloatingMenu(
+              key: ValueKey('expense-menu-${_tour.active}'),
               onManualEntry: _recordManualExpense,
               onGallery: () => _processImage(ImageSource.gallery),
               onCamera: () => _processImage(ImageSource.camera),
@@ -626,8 +690,11 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
             selectedIndex: _selectedIndex,
             onDestinationSelected: (index) {
               setState(() => _selectedIndex = index);
+              if (_tour.step == ManualTourStep.history && index == 1) {
+                _tour.go(ManualTourStep.transaction);
+              }
             },
-            destinations: const [
+            destinations: [
               NavigationDestination(
                 icon: Icon(Icons.grid_view_rounded),
                 selectedIcon: Icon(
@@ -637,7 +704,8 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
                 label: 'Dashboard',
               ),
               NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
+                key: _tour.key('history'),
+                icon: const Icon(Icons.receipt_long_outlined),
                 selectedIcon: Icon(Icons.receipt_long, color: AppColors.teal),
                 label: 'Riwayat',
               ),
