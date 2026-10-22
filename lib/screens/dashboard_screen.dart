@@ -8,6 +8,7 @@ import '../models/budget_totals.dart';
 import '../services/transaction_classifier.dart';
 import '../services/auth_service.dart';
 import '../services/tutorial_schedule.dart';
+import '../services/manual_tour.dart';
 import 'top_categories_widget.dart';
 import '../widgets/tutorial_dialog.dart';
 import '../theme/app_theme.dart';
@@ -143,24 +144,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
         button: true,
         label: 'Lihat dan bagikan progres $label',
         child: GestureDetector(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => SpendingProgressScreen(
-                progress: SpendingProgress(
-                  period: monthly
-                      ? (label.startsWith('Bulan Kemarin')
-                            ? 'Bulan Kemarin'
-                            : 'Bulan Ini')
-                      : label,
-                  date: periodDate,
-                  monthly: monthly,
-                  spent: total,
-                  budget: budget,
-                  previousSpent: previousSpent,
+          key: label == 'Hari Ini' ? ManualTour.instance.key('today') : null,
+          onTap: () async {
+            final tour = ManualTour.instance;
+            final tutorial =
+                label == 'Hari Ini' && tour.step == ManualTourStep.today;
+            await Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => SpendingProgressScreen(
+                  tutorial: tutorial,
+                  progress: SpendingProgress(
+                    period: monthly
+                        ? (label.startsWith('Bulan Kemarin')
+                              ? 'Bulan Kemarin'
+                              : 'Bulan Ini')
+                        : label,
+                    date: periodDate,
+                    monthly: monthly,
+                    spent: total,
+                    budget: budget,
+                    previousSpent: previousSpent,
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+            if (tutorial && mounted && tour.active) {
+              tour.go(
+                tour.step == ManualTourStep.progressBack
+                    ? ManualTourStep.history
+                    : ManualTourStep.today,
+              );
+            }
+          },
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(

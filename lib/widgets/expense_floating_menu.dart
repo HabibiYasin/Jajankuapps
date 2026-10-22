@@ -30,6 +30,13 @@ class _ExpenseFloatingMenuState extends State<ExpenseFloatingMenu> {
     Offset offset,
     Future<void> Function() callback,
   ) {
+    final colors = Theme.of(context).colorScheme;
+    final caption = switch (label) {
+      'Catat Manual' => 'Tulis',
+      'Unggah dari Galeri' => 'Galeri',
+      'Foto Struk' => 'Kamera',
+      _ => 'Masuk',
+    };
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
@@ -40,19 +47,51 @@ class _ExpenseFloatingMenuState extends State<ExpenseFloatingMenu> {
         child: AnimatedOpacity(
           opacity: _isOpen ? 1 : 0,
           duration: const Duration(milliseconds: 180),
-          child: FloatingActionButton.small(
-            key: label == 'Catat Manual'
-                ? ManualTour.instance.key('manual')
-                : null,
-            heroTag: label,
-            tooltip: label,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            foregroundColor: AppColors.teal,
-            onPressed: () async {
-              setState(() => _isOpen = false);
-              await callback();
-            },
-            child: Icon(icon),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.14),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  caption,
+                  style: TextStyle(
+                    color: colors.onPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              FloatingActionButton.small(
+                key: label == 'Catat Manual'
+                    ? ManualTour.instance.key('manual')
+                    : null,
+                heroTag: label,
+                tooltip: label,
+                backgroundColor: colors.primaryContainer,
+                foregroundColor: colors.onPrimaryContainer,
+                elevation: 5,
+                onPressed: () async {
+                  setState(() => _isOpen = false);
+                  await callback();
+                },
+                child: Icon(icon),
+              ),
+            ],
           ),
         ),
       ),
@@ -62,33 +101,33 @@ class _ExpenseFloatingMenuState extends State<ExpenseFloatingMenu> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 170,
-      height: widget.onIncomeEntry == null ? 170 : 235,
+      width: 210,
+      height: widget.onIncomeEntry == null ? 220 : 305,
       child: Stack(
         children: [
           if (widget.onIncomeEntry != null)
             _action(
               'Catat Pemasukan',
               Icons.add_card_rounded,
-              const Offset(4, 180),
+              const Offset(0, 220),
               widget.onIncomeEntry!,
             ),
           _action(
             'Catat Manual',
             Icons.edit_note_rounded,
-            const Offset(112, 4),
+            const Offset(140, 4),
             widget.onManualEntry,
           ),
           _action(
             'Unggah dari Galeri',
             Icons.add_photo_alternate_rounded,
-            const Offset(82, 82),
+            const Offset(86, 86),
             widget.onGallery,
           ),
           _action(
             'Foto Struk',
             Icons.camera_alt_outlined,
-            const Offset(4, 112),
+            const Offset(0, 134),
             widget.onCamera,
           ),
           Positioned(

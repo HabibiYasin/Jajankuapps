@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_application_1/screens/dashboard_screen.dart';
+import 'package:flutter_application_1/screens/spending_progress_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_application_1/models/transaction_model.dart';
 import 'package:flutter_application_1/screens/manual_expense_screen.dart';
@@ -36,12 +40,19 @@ class _LiveTourHostState extends State<LiveTourHost> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      actions: [
+        TextButton(
+          onPressed: () => tour.start(context),
+          child: const Text('Mulai'),
+        ),
+      ],
+    ),
     body: tab == 0
-        ? Center(
-            child: FilledButton(
-              onPressed: () => tour.start(context),
-              child: const Text('Mulai'),
-            ),
+        ? const DashboardScreen(
+            history: [],
+            dailyLimit: 50000,
+            monthlyLimit: 1500000,
           )
         : TransactionHistoryScreen(
             history: [if (tour.example != null) tour.example!],
@@ -59,7 +70,7 @@ class _LiveTourHostState extends State<LiveTourHost> {
               );
               if (tx != null && tour.active) {
                 tour.example = tx;
-                tour.go(ManualTourStep.history);
+                tour.go(ManualTourStep.today);
               }
             },
             onGallery: () async {},
@@ -88,6 +99,9 @@ class _LiveTourHostState extends State<LiveTourHost> {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   testWidgets(
     'Coach marks use original add menu, form, history, edit and delete controls',
     (tester) async {
@@ -126,6 +140,50 @@ void main() {
         findsOneWidget,
       );
       await tapKey('save');
+      expect(ManualTour.instance.step, ManualTourStep.today);
+      await tapKey('today');
+      expect(find.byType(SpendingProgressScreen), findsOneWidget);
+      expect(ManualTour.instance.step, ManualTourStep.download);
+      var downloads = 0;
+      var permitted = false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('gal'),
+        (call) async {
+          if (call.method == 'hasAccess' || call.method == 'requestAccess') {
+            return permitted;
+          }
+          if (call.method == 'putImageBytes') downloads++;
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          const MethodChannel('gal'),
+          null,
+        ),
+      );
+      for (var i = 0; i < 50; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump(const Duration(milliseconds: 120));
+        final button = tester.widget<OutlinedButton>(
+          find.byKey(ManualTour.instance.key('download')),
+        );
+        if (button.onPressed != null) break;
+      }
+      await tapKey('download');
+      expect(downloads, 0);
+      expect(ManualTour.instance.step, ManualTourStep.download);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(milliseconds: 400));
+      permitted = true;
+      await tapKey('download');
+      expect(downloads, 1);
+      expect(ManualTour.instance.step, ManualTourStep.progressBack);
+      await tapKey('progressBack');
+      expect(find.byType(SpendingProgressScreen), findsNothing);
+      expect(ManualTour.instance.step, ManualTourStep.history);
       await tapKey('history');
       expect(find.byType(TransactionHistoryScreen), findsOneWidget);
       await tapKey('transaction');

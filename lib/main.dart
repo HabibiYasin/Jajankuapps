@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show appFlavor;
+import 'package:flutter/services.dart' show appFlavor, SystemUiOverlayStyle;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -421,7 +421,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       if (_tour.active) {
         _tutorialExamples.add(tx);
         _tour.example = tx;
-        _tour.go(ManualTourStep.history);
+        _tour.go(ManualTourStep.today);
       }
       return;
     }
@@ -547,6 +547,9 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         toolbarHeight: 72,
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,

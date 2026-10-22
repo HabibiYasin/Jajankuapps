@@ -92,7 +92,7 @@ class _ManualExpenseScreenState extends State<ManualExpenseScreen> {
   void _save() {
     if (!_formKey.currentState!.validate()) return;
     final amount = double.parse(_amount.text);
-    if (widget.tutorial) ManualTour.instance.go(ManualTourStep.history);
+    if (widget.tutorial) ManualTour.instance.go(ManualTourStep.today);
     Navigator.pop(
       context,
       TransactionModel(

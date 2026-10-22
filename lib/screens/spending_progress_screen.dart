@@ -15,10 +15,16 @@ import '../services/profile_plan_store.dart';
 import '../widgets/spending_card_customizer.dart';
 import '../services/spending_card_renderer.dart';
 import '../services/auth_service.dart';
+import '../services/manual_tour.dart';
 
 class SpendingProgressScreen extends StatefulWidget {
   final SpendingProgress progress;
-  const SpendingProgressScreen({super.key, required this.progress});
+  final bool tutorial;
+  const SpendingProgressScreen({
+    super.key,
+    required this.progress,
+    this.tutorial = false,
+  });
   @override
   State<SpendingProgressScreen> createState() => _SpendingProgressScreenState();
 }
@@ -42,6 +48,13 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
     super.initState();
     _messageVariant = Random().nextInt(widget.progress.messages.length);
     _image = _renderImage();
+    if (widget.tutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ManualTour.instance.step == ManualTourStep.today) {
+          ManualTour.instance.go(ManualTourStep.download);
+        }
+      });
+    }
     final auth = AuthService.instance;
     if (auth.isConfigured) {
       _authSubscription = auth.authStateChanges.listen(_watchPlan);
@@ -137,6 +150,10 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
         }
         await Gal.putImageBytes(bytes, name: name);
         if (mounted) {
+          if (widget.tutorial &&
+              ManualTour.instance.step == ManualTourStep.download) {
+            ManualTour.instance.go(ManualTourStep.progressBack);
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Gambar berhasil disimpan ke galeri.'),
@@ -164,8 +181,10 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
+      leading: widget.tutorial
+          ? BackButton(key: ManualTour.instance.key('progressBack'))
+          : null,
       title: Text('Progres ${widget.progress.period}'),
-      foregroundColor: const Color(0xFF105438),
     ),
     body: FutureBuilder<Uint8List>(
       future: _image,
@@ -173,6 +192,7 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
         if (snapshot.hasError) {
           return Center(
             child: TextButton(
+              key: widget.tutorial ? ManualTour.instance.key('download') : null,
               onPressed: () => setState(() {
                 _image = _renderImage();
               }),
@@ -263,6 +283,9 @@ class _SpendingProgressScreenState extends State<SpendingProgressScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
+                            key: widget.tutorial
+                                ? ManualTour.instance.key('download')
+                                : null,
                             onPressed: _busy || !ready
                                 ? null
                                 : () => _export(bytes!, share: false),
