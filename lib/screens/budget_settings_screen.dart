@@ -159,12 +159,12 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
         const SizedBox(height: 12),
         Text(
           _mode == BudgetMode.flat
-              ? 'Budget harian dan mingguan tetap selama bulan ini, meskipun pengeluaran melewati budget.'
-              : 'Kelebihan pengeluaran dibagi ke sisa hari bulan ini dan mengurangi budget mulai besok. Penghematan tidak menaikkan jatah. Jatah paling rendah Rp0 dan direset pada bulan baru.',
+              ? 'Jatah uangmu tiap hari tetap sama. Kalau hari ini belanja lebih banyak, jatah besok tidak berubah.'
+              : 'Kalau hari ini belanja lebih dari jatah, jatah untuk hari-hari berikutnya jadi lebih kecil. Kalau belanja lebih sedikit, jatah tidak bertambah. Jatah paling kecil Rp0. Bulan depan, jatah kembali seperti awal.',
         ),
         const SizedBox(height: 12),
         Text(
-          'Budget harian awal = bulanan ÷ ${BudgetLimits.daysInMonth(now)} hari bulan ini. Budget mingguan = 7 × budget harian.',
+          'Uang sebulan dibagi rata untuk ${BudgetLimits.daysInMonth(now)} hari. Jatah seminggu adalah jatah untuk 7 hari.',
         ),
         if (valid) ...[
           const SizedBox(height: 12),
@@ -193,7 +193,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
     children: [
       const Text(
         'Kategori yang mengurangi budget',
-        style: TextStyle(fontWeight: FontWeight.bold),
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
       ),
       const SizedBox(height: 8),
       for (final category in TransactionClassifier.categories)
@@ -293,17 +293,21 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
                 'Atur batas pengeluaran',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-            const SizedBox(height: 8),
-            Text(
-              _owner == null
-                  ? 'Budget Guest disimpan di HP ini.'
-                  : 'Budget mengikuti akun yang sedang login.',
-            ),
-            const SizedBox(height: 24),
-            if (!widget.onboarding || _step == 0) _categoryPicker(),
-            if (!widget.onboarding || _step == 1) ...[
+            if (!widget.onboarding) ...[
               const SizedBox(height: 24),
               _input('Budget Bulanan', _monthly),
+            ],
+            if (widget.onboarding && _owner == null) ...[
+              const SizedBox(height: 8),
+              const Text('Budget Guest disimpan di HP ini.'),
+            ],
+            if (!widget.onboarding || _step == 0) ...[
+              const SizedBox(height: 24),
+              _categoryPicker(),
+            ],
+            if (!widget.onboarding || _step == 1) ...[
+              const SizedBox(height: 24),
+              if (widget.onboarding) _input('Budget Bulanan', _monthly),
               _budgetOptions(),
               const Text(
                 'Semua ini nanti bisa diubah di Personalisasi → Limit Budget, termasuk pilihan kategori kamu.',
