@@ -93,7 +93,8 @@ service cloud.firestore {
       allow read, delete: if owns(uid);
       allow create, update: if owns(uid)
         && request.resource.data.keys().hasAll(['daily', 'weekly', 'monthly'])
-        && request.resource.data.keys().hasOnly(['daily', 'weekly', 'monthly', 'categories'])
+        && request.resource.data.keys().hasOnly(['daily', 'weekly', 'monthly', 'categories', 'mode'])
+        && request.resource.data.get('mode', 'flat') in ['flat', 'flexible']
         && (!('categories' in request.resource.data)
           || (request.resource.data.categories is list
             && request.resource.data.categories.size() > 0

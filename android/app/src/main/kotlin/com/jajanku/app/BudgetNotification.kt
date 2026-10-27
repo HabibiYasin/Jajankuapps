@@ -91,7 +91,7 @@ object BudgetNotification {
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now.time)
         if (prefs.getString("last_noon_date", null) == date) return
         val total = JSONObject(prefs.getString("totals", "{}") ?: "{}").optDouble(date, 0.0)
-        val limit = prefs.getFloat("limit", 50000f).toDouble()
+        val limit = dailyLimit(context)
         if (!NoonBudgetReminder.shouldNotify(total, limit, now)) return
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(
                 Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
@@ -143,13 +143,26 @@ object BudgetNotification {
         }
     }
 
-    fun save(context: Context, limit: Double, totals: Map<String, Number>) {
-        require(limit.isFinite() && limit > 0) { "Budget harus lebih dari nol" }
+    fun save(context: Context, limit: Double, totals: Map<String, Number>, monthly: Double? = null, flexible: Boolean = false) {
+        require(limit.isFinite() && limit >= 0) { "Budget tidak valid" }
+        require(monthly == null || (monthly.isFinite() && monthly > 0))
         require(totals.values.all { it.toDouble().isFinite() })
         // Commit before replying to Flutter so restoration survives process death.
         check(context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
             .edit().putFloat("limit", limit.toFloat())
+            .putString("monthly_budget", monthly?.toString())
+            .putBoolean("flexible", flexible)
             .putString("totals", JSONObject(totals).toString()).commit())
+    }
+
+    private fun dailyLimit(context: Context): Double {
+        val prefs = context.getSharedPreferences("budget_notification", Context.MODE_PRIVATE)
+        val monthly = prefs.getString("monthly_budget", null)?.toDoubleOrNull()
+            ?: return prefs.getFloat("limit", 50000f).toDouble()
+        val json = JSONObject(prefs.getString("totals", "{}") ?: "{}")
+        val totals = mutableMapOf<String, Number>()
+        for (key in json.keys()) totals[key] = json.optDouble(key, 0.0)
+        return BudgetAllowance.daily(monthly, prefs.getBoolean("flexible", false), Calendar.getInstance(), totals)
     }
 
     fun refresh(context: Context, rescheduleNoon: Boolean = false) {
@@ -176,8 +189,8 @@ object BudgetNotification {
         }
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)
         val total = JSONObject(prefs.getString("totals", "{}") ?: "{}").optDouble(date, 0.0)
-        val limit = prefs.getFloat("limit", 50000f).toDouble()
-        val percent = total / limit * 100
+        val limit = dailyLimit(context)
+        val percent = if (limit > 0) total / limit * 100 else 100.0
         val color = Color.parseColor(when {
             percent >= 100 -> "#E53935"
             percent >= 80 -> "#F9A825"
@@ -189,7 +202,7 @@ object BudgetNotification {
             maximumFractionDigits = 1
         }.format(percent)
         val title = "Rp${money.format(total)} / Rp${money.format(limit)}"
-        val text = "$percentLabel% budget harian terpakai"
+        val text = if (limit == 0.0) "Jatah budget hari ini sudah habis" else "$percentLabel% budget harian terpakai"
         val bitmap = Bitmap.createBitmap(600, 8, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -239,7 +252,7 @@ object BudgetNotification {
         val lastDate = prefs.getString("last_threshold_date", null)
         if (lastDate != date) manager.cancel(THRESHOLD_ID)
         val total = JSONObject(prefs.getString("totals", "{}") ?: "{}").optDouble(date, 0.0)
-        val limit = prefs.getFloat("limit", 50000f).toDouble()
+        val limit = dailyLimit(context)
         val threshold = BudgetThresholdAlert.nextThreshold(total, limit, date, lastDate,
             prefs.getInt("last_threshold", 0)) ?: return
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(
@@ -253,7 +266,7 @@ object BudgetNotification {
             if (manager.getNotificationChannel(THRESHOLD_CHANNEL)?.importance == NotificationManager.IMPORTANCE_NONE) return
         }
         val money = NumberFormat.getIntegerInstance(Locale.forLanguageTag("id-ID"))
-        val title = "Budget harian melewati $threshold%"
+        val title = if (limit == 0.0) "Jatah budget hari ini sudah habis" else "Budget harian melewati $threshold%"
         val body = "Pengeluaran hari ini Rp${money.format(total)} dari budget Rp${money.format(limit)}. " +
             if (threshold == 100) "Budget sudah terlampaui. Ketuk untuk cek pengeluaranmu."
             else "Ketuk untuk cek sisa budgetmu."

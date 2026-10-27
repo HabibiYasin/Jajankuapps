@@ -4,6 +4,7 @@ class SpendingProgress {
   final bool monthly;
   final double spent;
   final double budget;
+  final bool budgetExhausted;
   final double? previousSpent;
 
   const SpendingProgress({
@@ -11,6 +12,7 @@ class SpendingProgress {
     required this.date,
     required this.spent,
     required this.budget,
+    this.budgetExhausted = false,
     this.monthly = false,
     this.previousSpent,
   });
@@ -18,6 +20,7 @@ class SpendingProgress {
   bool get hasBudget => budget.isFinite && budget > 0;
   double get percentage => hasBudget ? spent / budget * 100 : 0;
   String get title {
+    if (budgetExhausted) return 'Budget Habis';
     if (!hasBudget) return 'Belum Ada Budget';
     if (percentage == 0) return 'Puasa atau lupa?';
     if (percentage <= 50) return 'Hematers';
@@ -59,6 +62,9 @@ class SpendingProgress {
   }
 
   List<String> get messages => switch (title) {
+    'Budget Habis' => const [
+      'Jatah budget hari ini sudah habis setelah penyesuaian pengeluaran sebelumnya. Tahan dulu pengeluaran berikutnya, ya.',
+    ],
     'Puasa atau lupa?' => const [
       'Belum ada jajan yang tercatat. Lagi hemat, atau belum sempat nyatet?',
       'Catatan jajan masih kosong. Kalau tadi sudah jajan, jangan lupa dicatat, ya.',

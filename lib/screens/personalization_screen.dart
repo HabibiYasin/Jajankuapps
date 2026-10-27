@@ -549,7 +549,8 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
           _menuTile(
             icon: Icons.account_balance_wallet_outlined,
             title: 'Limit Budget',
-            subtitle: 'Atur kategori dan batas harian, mingguan, bulanan',
+            subtitle:
+                'Atur budget bulanan, kategori, dan mode flat atau flexible',
             onTap: () async {
               final limits = AccountDataService.instance.limits;
               await Navigator.push(
@@ -560,6 +561,7 @@ class _PersonalizationScreenState extends State<PersonalizationScreen> {
                     weeklyLimit: limits.weekly,
                     monthlyLimit: limits.monthly,
                     categories: limits.trackedCategories,
+                    mode: limits.mode,
                   ),
                 ),
               );

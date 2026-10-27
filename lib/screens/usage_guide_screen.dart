@@ -21,9 +21,14 @@ const List<_GuideTopic> _topics = [
       (
         title: 'Isi batas pengeluaran',
         body:
-            'Isi Budget Harian, Budget Mingguan, dan Budget Bulanan dengan angka '
-            'lebih dari 0, lalu tekan Simpan Pengaturan. Ketiganya diisi sendiri; '
-            'budget bulanan tidak otomatis dihitung dari budget harian.\n\n'
+            'Isi Budget Bulanan dengan angka lebih dari 0, pilih Flat budget atau '
+            'Flexible budget, lalu tekan Simpan Pengaturan. Budget harian awal '
+            'adalah budget bulanan dibagi jumlah hari kalender bulan itu. '
+            'Budget mingguan adalah 7 kali budget harian.\n\n'
+            'Flat: jatah tetap selama bulan itu meskipun pengeluaran berlebih. '
+            'Flexible: kelebihan pengeluaran mengurangi jatah mulai besok, '
+            'dibagi rata ke sisa hari bulan ini. Penghematan tidak menambah jatah. '
+            'Jatah paling rendah Rp0 dan direset pada bulan baru.\n\n'
             'Budget adalah batas pengeluaran yang kamu tentukan, bukan saldo rekening '
             'atau dompet digital. Hanya pengeluaran dalam kategori pilihanmu yang '
             'dihitung sebagai pemakaian budget.',
@@ -104,7 +109,7 @@ const List<_GuideTopic> _topics = [
             'masih bisa terlihat, jadi periksa pratinjaunya dulu. '
             'Tekan Unduh jika ingin menyimpan gambar ke galeri. '
             'Jika diminta, izinkan akses penyimpanan foto.\n\n'
-            'Akun premium juga dapat mengatur karakter dan warna kartu '
+            'Kamu juga dapat mengatur karakter dan warna kartu '
             'melalui pilihan yang muncul di halaman progres.',
       ),
       (
@@ -144,8 +149,8 @@ const List<_GuideTopic> _topics = [
             'rekap harian, dan rincian transaksi. Laporan mengikuti bulan '
             'yang dipilih pada dialog, bukan filter pencarian di Riwayat. '
             'Laporan bulan berjalan hanya memuat catatan yang sudah ada saat dibuat.\n\n'
-            'Akun non-premium dapat memilih bulan ini dan bulan sebelumnya. '
-            'Akun premium dapat memilih 12 bulan terakhir, termasuk bulan ini.',
+            'Selama masa evaluasi, semua akun dapat memilih 12 bulan terakhir, '
+            'termasuk bulan ini.',
       ),
     ],
   ),
@@ -296,8 +301,8 @@ const List<_GuideTopic> _topics = [
         body:
             'Periksa tab yang dibuka: uang masuk ada di Pemasukan, uang keluar '
             'ada di Riwayat. Periksa juga pencarian dan filter. Riwayat '
-            'non-premium menampilkan bulan ini dan bulan sebelumnya; premium '
-            'menampilkan 12 bulan terakhir. Batas tampilan bulan tidak '
+            'selama masa evaluasi menampilkan 12 bulan terakhir untuk semua akun. '
+            'Batas tampilan bulan tidak '
             'menghapus transaksi yang tersimpan.',
       ),
       (

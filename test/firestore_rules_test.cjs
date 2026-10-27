@@ -118,6 +118,11 @@ async function query(uid, owner, expected) {
   await request('PATCH',tx,'alice',{...transaction,merchant:{stringValue:'Edited'}});
   const settings = 'users/alice/settings/budget';
   await request('PATCH',settings,'alice',budget);
+  await request('PATCH',settings,'alice',{...budget,mode:{stringValue:'flat'}});
+  await request('PATCH',settings,'alice',{...budget,mode:{stringValue:'flexible'}});
+  await request('PATCH',settings,'alice',{...budget,mode:{stringValue:'unknown'}},403);
+  await request('PATCH',settings,'alice',{...budget,mode:{booleanValue:true}},403);
+  await request('PATCH',settings,'bob',{...budget,mode:{stringValue:'flexible'}},403);
   await request('GET',settings,'bob',undefined,403);
   await request('PATCH',settings,'bob',budget,403);
   await request('PATCH',settings,'alice',{...budget,daily:{doubleValue:0}},403);

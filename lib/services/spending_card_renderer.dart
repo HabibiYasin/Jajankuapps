@@ -210,7 +210,9 @@ class SpendingCardRenderer {
       weight: FontWeight.w900,
     );
     label(
-      !data.hasBudget
+      data.budgetExhausted
+          ? 'Jatah hari ini sudah habis'
+          : !data.hasBudget
           ? 'Atur budget untuk lihat progres'
           : data.monthly
           ? 'Budget bulanan terpakai'
@@ -229,7 +231,9 @@ class SpendingCardRenderer {
       RRect.fromRectAndRadius(bar, const Radius.circular(11)),
       Paint()..color = cardColor?.tint ?? const Color(0xFFFFE8D1),
     );
-    final fraction = (data.percentage / 100).clamp(0.0, 1.0);
+    final fraction = data.budgetExhausted
+        ? 1.0
+        : (data.percentage / 100).clamp(0.0, 1.0);
     if (fraction > 0) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(

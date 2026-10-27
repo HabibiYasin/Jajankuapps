@@ -37,9 +37,15 @@ class BudgetThresholdAlertTest {
         assertNull(next(40000.0, 75, limit = 100000.0))
     }
 
+    @Test fun zeroAllowanceAlertsOnlyWhenSpendingOccurs() {
+        assertNull(next(0.0, limit = 0.0))
+        assertEquals(100, next(1.0, limit = 0.0))
+        assertNull(next(1.0, last = 100, limit = 0.0))
+    }
+
     @Test fun invalidTotalsAndLimitsNeverAlert() {
         for (total in listOf(-1.0, Double.NaN, Double.POSITIVE_INFINITY)) assertNull(next(total))
-        for (limit in listOf(0.0, -1.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+        for (limit in listOf(-1.0, Double.NaN, Double.POSITIVE_INFINITY)) {
             assertNull(next(62500.0, limit = limit))
         }
     }

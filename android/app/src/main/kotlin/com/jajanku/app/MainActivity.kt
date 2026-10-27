@@ -41,7 +41,9 @@ class MainActivity : FlutterActivity() {
                     "sync" -> {
                         val limit = call.argument<Number>("dailyLimit")?.toDouble() ?: 0.0
                         val totals = call.argument<Map<String, Number>>("totals") ?: emptyMap()
-                        BudgetNotification.save(this, limit, totals)
+                        val monthly = call.argument<Number>("monthlyBudget")?.toDouble()
+                        val flexible = call.argument<Boolean>("flexible") ?: false
+                        BudgetNotification.save(this, limit, totals, monthly, flexible)
                         BudgetNotification.refresh(this)
                         requestBudgetNotificationPermission()
                         result.success(null)

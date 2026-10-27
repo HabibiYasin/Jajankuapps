@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/budget_limits.dart';
+import '../models/spending_progress.dart';
 import '../services/account_data_service.dart';
 import '../services/transaction_classifier.dart';
 
@@ -13,6 +14,7 @@ class BudgetSettingsScreen extends StatefulWidget {
   final bool onboarding;
   final List<String>? categories;
   final AccountDataService? accountData;
+  final BudgetMode mode;
   const BudgetSettingsScreen({
     super.key,
     required this.dailyLimit,
@@ -21,6 +23,7 @@ class BudgetSettingsScreen extends StatefulWidget {
     this.onboarding = false,
     this.categories,
     this.accountData,
+    this.mode = BudgetMode.flat,
   });
 
   @override
@@ -29,12 +32,7 @@ class BudgetSettingsScreen extends StatefulWidget {
 
 class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
   final _form = GlobalKey<FormState>();
-  late final _daily = TextEditingController(
-    text: widget.dailyLimit.toStringAsFixed(0),
-  );
-  late final _weekly = TextEditingController(
-    text: widget.weeklyLimit.toStringAsFixed(0),
-  );
+  late BudgetMode _mode = widget.mode;
   late final _monthly = TextEditingController(
     text: widget.monthlyLimit.toStringAsFixed(0),
   );
@@ -55,8 +53,6 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
 
   @override
   void dispose() {
-    _daily.dispose();
-    _weekly.dispose();
     _monthly.dispose();
     super.dispose();
   }
@@ -65,6 +61,8 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
       controller: controller,
+      enabled: !_saving,
+      onChanged: (_) => setState(() {}),
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration: InputDecoration(labelText: label, prefixText: 'Rp '),
@@ -92,11 +90,14 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
     }
     setState(() => _saving = true);
     try {
+      final monthly = double.parse(_monthly.text);
+      final daily = monthly / BudgetLimits.daysInMonth(DateTime.now());
       await _data.saveBudget(
         BudgetLimits(
-          daily: double.parse(_daily.text),
-          weekly: double.parse(_weekly.text),
-          monthly: double.parse(_monthly.text),
+          daily: daily,
+          weekly: daily * 7,
+          monthly: monthly,
+          mode: _mode,
           categories: TransactionClassifier.categories
               .where(_categories.contains)
               .toList(),
@@ -122,6 +123,69 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Widget _budgetOptions() {
+    final now = DateTime.now();
+    final monthly = double.tryParse(_monthly.text) ?? 0;
+    final limits = BudgetLimits(
+      monthly: monthly,
+      mode: _mode,
+      categories: _categories.toList(),
+    );
+    final valid = monthly.isFinite && monthly > 0 && monthly <= 1e15;
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Mode budget',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        SegmentedButton<BudgetMode>(
+          segments: const [
+            ButtonSegment(value: BudgetMode.flat, label: Text('Flat budget')),
+            ButtonSegment(
+              value: BudgetMode.flexible,
+              label: Text('Flexible budget'),
+            ),
+          ],
+          selected: {_mode},
+          onSelectionChanged: _saving
+              ? null
+              : (values) => setState(() => _mode = values.single),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _mode == BudgetMode.flat
+              ? 'Budget harian dan mingguan tetap selama bulan ini, meskipun pengeluaran melewati budget.'
+              : 'Kelebihan pengeluaran dibagi ke sisa hari bulan ini dan mengurangi budget mulai besok. Penghematan tidak menaikkan jatah. Jatah paling rendah Rp0 dan direset pada bulan baru.',
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Budget harian awal = bulanan ÷ ${BudgetLimits.daysInMonth(now)} hari bulan ini. Budget mingguan = 7 × budget harian.',
+        ),
+        if (valid) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Budget harian hari ini: ${SpendingProgress.rupiah(limits.dailyFor(now, _data.history))}',
+          ),
+          Text(
+            'Budget mingguan saat ini: ${SpendingProgress.rupiah(limits.weeklyFor(now, _data.history))}',
+          ),
+          if (_mode == BudgetMode.flexible) ...[
+            Text(
+              'Budget harian besok: ${SpendingProgress.rupiah(limits.dailyFor(tomorrow, _data.history))}',
+            ),
+            Text(
+              'Budget mingguan besok: ${SpendingProgress.rupiah(limits.weeklyFor(tomorrow, _data.history))}',
+            ),
+          ],
+        ],
+        const SizedBox(height: 16),
+      ],
+    );
   }
 
   Widget _categoryPicker() => Column(
@@ -217,7 +281,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
                 child: Text(
                   _step == 0
                       ? 'Selamat datang! Kamu mau pakai aplikasi ini untuk track apa?'
-                      : 'Berapa budget harian, mingguan, dan bulanan kamu?',
+                      : 'Berapa budget bulanan kamu?',
                   style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -239,9 +303,8 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
             if (!widget.onboarding || _step == 0) _categoryPicker(),
             if (!widget.onboarding || _step == 1) ...[
               const SizedBox(height: 24),
-              _input('Budget Harian', _daily),
-              _input('Budget Mingguan', _weekly),
               _input('Budget Bulanan', _monthly),
+              _budgetOptions(),
               const Text(
                 'Semua ini nanti bisa diubah di Personalisasi → Limit Budget, termasuk pilihan kategori kamu.',
               ),

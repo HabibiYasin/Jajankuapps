@@ -153,8 +153,11 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   String? _visibleUid;
   bool _isPremium = false;
   StreamSubscription<bool>? _planSubscription;
-  double get _dailyBudgetLimit => _accountData.limits.daily;
-  double get _weeklyBudgetLimit => _accountData.limits.weekly;
+  Timer? _budgetDayTimer;
+  double get _dailyBudgetLimit =>
+      _accountData.limits.dailyFor(DateTime.now(), _transactionHistory);
+  double get _weeklyBudgetLimit =>
+      _accountData.limits.weeklyFor(DateTime.now(), _transactionHistory);
   double get _monthlyBudgetLimit => _accountData.limits.monthly;
 
   List<TransactionModel> _transactionHistory = [];
@@ -185,6 +188,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
     _accountData.addListener(_applyAccountData);
     _accountData.start();
     _applyAccountData();
+    _scheduleBudgetDayRefresh();
 
     _intentDataStreamSubscription = ReceiveSharingIntent.instance
         .getMediaStream()
@@ -214,6 +218,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
 
   @override
   void dispose() {
+    _budgetDayTimer?.cancel();
     _tour.removeListener(_refreshTour);
     _tour.onStart = null;
     _tour.stop();
@@ -247,8 +252,20 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
       BudgetNotificationService.sync(
         _accountData.limits.tracked(_transactionHistory),
         _dailyBudgetLimit,
+        budget: _accountData.limits,
       ),
     );
+  }
+
+  void _scheduleBudgetDayRefresh() {
+    _budgetDayTimer?.cancel();
+    final now = DateTime.now();
+    final next = DateTime(now.year, now.month, now.day + 1);
+    _budgetDayTimer = Timer(next.difference(now), () {
+      if (!mounted) return;
+      _applyAccountData();
+      _scheduleBudgetDayRefresh();
+    });
   }
 
   void _watchPlan(String? uid) {
@@ -317,6 +334,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _scheduleBudgetDayRefresh();
       _loadTransactionsFromDB();
       unawaited(_recordAppOpen());
     }
@@ -539,6 +557,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
         weeklyLimit: _weeklyBudgetLimit,
         monthlyLimit: _monthlyBudgetLimit,
         categories: _accountData.limits.trackedCategories,
+        mode: _accountData.limits.mode,
       );
     }
     if (_isLoading) {
@@ -604,6 +623,7 @@ class _QrisTrackerAppState extends State<QrisTrackerApp>
             dailyLimit: _dailyBudgetLimit,
             monthlyLimit: _monthlyBudgetLimit,
             budgetCategories: _accountData.limits.trackedCategories,
+            budgetLimits: _accountData.limits,
           ),
           TransactionHistoryScreen(
             isPremium: _isPremium,

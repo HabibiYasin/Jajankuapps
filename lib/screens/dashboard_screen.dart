@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/transaction_model.dart';
+import '../models/plan_access.dart';
+import '../models/budget_limits.dart';
 import '../models/budget_totals.dart';
 import '../services/transaction_classifier.dart';
 import '../services/auth_service.dart';
@@ -20,6 +22,7 @@ class DashboardScreen extends StatefulWidget {
   final List<TransactionModel> history;
   final double dailyLimit;
   final double monthlyLimit;
+  final BudgetLimits? budgetLimits;
   final List<String> budgetCategories;
 
   const DashboardScreen({
@@ -28,6 +31,7 @@ class DashboardScreen extends StatefulWidget {
     required this.history,
     required this.dailyLimit,
     required this.monthlyLimit,
+    this.budgetLimits,
     this.budgetCategories = TransactionClassifier.categories,
   });
 
@@ -163,6 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     monthly: monthly,
                     spent: total,
                     budget: budget,
+                    budgetExhausted: budget == 0,
                     previousSpent: previousSpent,
                   ),
                 ),
@@ -241,7 +246,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
-                    value: budget > 0 ? (total / budget).clamp(0.0, 1.0) : 0.0,
+                    value: budget > 0 ? (total / budget).clamp(0.0, 1.0) : 1.0,
                     minHeight: 6,
                     backgroundColor: AppColors.mist.withValues(alpha: 0.3),
                     color: accent,
@@ -452,6 +457,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final yesterday = DateTime(now.year, now.month, now.day - 1);
     final currentDaily = _calculateTotal(now);
     final yesterdayTotal = _calculateTotal(yesterday);
+    final todayLimit =
+        widget.budgetLimits?.dailyFor(now, widget.history) ?? widget.dailyLimit;
+    final yesterdayLimit =
+        widget.budgetLimits?.dailyFor(yesterday, widget.history) ??
+        widget.dailyLimit;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
@@ -472,9 +482,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 value: 'Rp${_formatAmount(currentDaily)}',
                 total: currentDaily,
                 previousSpent: yesterdayTotal,
-                budget: widget.dailyLimit,
+                budget: todayLimit,
                 icon: Icons.today_rounded,
-                accent: currentDaily >= widget.dailyLimit
+                accent: currentDaily >= todayLimit
                     ? AppColors.pink
                     : AppColors.teal,
               ),
@@ -484,9 +494,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 periodDate: yesterday,
                 value: 'Rp${_formatAmount(yesterdayTotal)}',
                 total: yesterdayTotal,
-                budget: widget.dailyLimit,
+                budget: yesterdayLimit,
                 icon: Icons.history_rounded,
-                accent: yesterdayTotal >= widget.dailyLimit
+                accent: yesterdayTotal >= yesterdayLimit
                     ? AppColors.pink
                     : AppColors.teal,
               ),
@@ -505,11 +515,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               alignment: Alignment.center,
               children: [
                 ExcludeSemantics(
-                  excluding: !widget.isPremium,
+                  excluding: !PlanAccess(isPremium: widget.isPremium)
+                      .hasFullFeatureAccess,
                   child: IgnorePointer(
-                    ignoring: !widget.isPremium,
+                    ignoring: !PlanAccess(isPremium: widget.isPremium)
+                        .hasFullFeatureAccess,
                     child: ImageFiltered(
-                      enabled: !widget.isPremium,
+                      enabled: !PlanAccess(isPremium: widget.isPremium)
+                          .hasFullFeatureAccess,
                       imageFilter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
                       child: Container(
                         height: 190,
@@ -528,7 +541,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                if (!widget.isPremium)
+                if (!PlanAccess(isPremium: widget.isPremium)
+                    .hasFullFeatureAccess)
                   Positioned.fill(
                     child: ColoredBox(
                       color: Theme.of(context).colorScheme.surface

@@ -13,11 +13,13 @@ void main() {
     final now = DateTime(2026, 1, 15);
     const free = PlanAccess();
     const premium = PlanAccess(isPremium: true);
-    expect(free.months(now), [DateTime(2026, 1), DateTime(2025, 12)]);
+    expect(free.months(now), premium.months(now));
+    expect(free.hasFullFeatureAccess, isTrue);
     expect(premium.months(now), hasLength(12));
     expect(premium.months(now).last, DateTime(2025, 2));
     expect(free.includes(DateTime(2025, 12), now), isTrue);
-    expect(free.includes(DateTime(2025, 11, 30, 23, 59), now), isFalse);
+    expect(free.includes(DateTime(2025, 11, 30, 23, 59), now), isTrue);
+    expect(free.includes(DateTime(2025, 1, 31, 23, 59), now), isFalse);
     expect(premium.includes(DateTime(2025, 2), now), isTrue);
     expect(premium.includes(DateTime(2025, 1, 31, 23, 59), now), isFalse);
     expect(premium.includes(DateTime(2026, 2), now), isFalse);
@@ -65,12 +67,12 @@ void main() {
         await tester.pumpWidget(app(false));
         expect(find.text('Month 0'), findsOneWidget);
         expect(find.text('Month 1'), findsOneWidget);
-        expect(find.text('Month 2'), findsNothing);
-        expect(find.text('Month 11'), findsNothing);
+        expect(find.text('Month 2'), findsOneWidget);
+        expect(find.text('Month 11'), findsOneWidget);
         var dropdown = tester.widget<DropdownButton<int>>(
           find.byType(DropdownButton<int>),
         );
-        expect(dropdown.items, hasLength(3));
+        expect(dropdown.items, hasLength(13));
 
         await tester.pumpWidget(app(true));
         await tester.pumpAndSettle();
@@ -88,8 +90,8 @@ void main() {
 
         await tester.pumpWidget(app(false));
         await tester.pumpAndSettle();
-        expect(find.text('Month 11'), findsNothing);
-        expect(find.text('Month 0'), findsOneWidget);
+        expect(find.text('Month 11'), findsOneWidget);
+        expect(find.text('Month 0'), findsNothing);
         expect(history, hasLength(5));
         expect(tester.takeException(), isNull);
       },
@@ -97,7 +99,7 @@ void main() {
   }
 
   testWidgets(
-    'Report offers 12 or 2 months even without transactions and responds to downgrade',
+    'Report keeps 12 months for free accounts even without transactions',
     (tester) async {
       final premium = ValueNotifier(true);
       addTearDown(premium.dispose);
@@ -131,18 +133,15 @@ void main() {
         find.byType(DropdownButton<DateTime>),
       );
       final now = DateTime.now();
-      expect(dropdown.items!.map((item) => item.value), [
-        DateTime(now.year, now.month),
-        DateTime(now.year, now.month - 1),
-      ]);
-      expect(dropdown.value, DateTime(now.year, now.month));
+      expect(dropdown.items, hasLength(12));
+      expect(dropdown.value, DateTime(now.year, now.month - 11));
       await tester.tap(find.text('Batal'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('Seven-day chart is blurred for free and clear for premium', (
+  testWidgets('Seven-day chart is accessible for free and premium', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -160,10 +159,10 @@ void main() {
     );
     await tester.pumpWidget(app(false));
     await tester.pumpAndSettle();
-    expect(find.text('only for premium'), findsOneWidget);
+    expect(find.text('only for premium'), findsNothing);
     expect(
       tester.widget<ImageFiltered>(find.byType(ImageFiltered)).enabled,
-      isTrue,
+      isFalse,
     );
     await tester.pumpWidget(app(true));
     await tester.pumpAndSettle();

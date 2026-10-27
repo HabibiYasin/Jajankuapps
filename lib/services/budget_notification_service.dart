@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/transaction_model.dart';
+import '../models/budget_limits.dart';
 
 class BudgetNotificationService {
   static const _channel = MethodChannel('com.jajanku.app/budget_notification');
@@ -59,13 +60,18 @@ class BudgetNotificationService {
 
   static Future<void> sync(
     List<TransactionModel> history,
-    double dailyLimit,
-  ) async {
+    double dailyLimit, {
+    BudgetLimits? budget,
+  }) async {
     if (!isSupported) return;
     try {
       await _channel.invokeMethod<void>('sync', {
         'dailyLimit': dailyLimit,
         'totals': dailyTotals(history),
+        if (budget != null) ...{
+          'monthlyBudget': budget.monthly,
+          'flexible': budget.mode == BudgetMode.flexible,
+        },
       });
     } on PlatformException catch (error) {
       debugPrint('Notifikasi budget gagal diperbarui: $error');

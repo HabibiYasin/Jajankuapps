@@ -373,7 +373,7 @@ class AccountDataService extends ChangeNotifier {
     _checkOwner(expectedUid);
     if (!budget.isValid) {
       throw ArgumentError(
-        'Pilih kategori yang valid dan isi semua budget dengan angka lebih dari nol.',
+        'Pilih kategori yang valid dan isi budget bulanan dengan angka lebih dari nol.',
       );
     }
     if (expectedUid == null) {

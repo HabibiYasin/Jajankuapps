@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/premium_status.dart';
+import '../models/plan_access.dart';
 import '../services/auth_service.dart';
 import '../services/premium_billing_service.dart';
 import '../services/profile_plan_store.dart';
@@ -185,6 +186,12 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
                 ),
               ),
             ),
+            if (PlanAccess.freeFeaturesOpen) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Selama masa evaluasi, akun Gratis dapat memakai riwayat dan laporan 12 bulan serta grafik 7 hari tanpa berlangganan.',
+              ),
+            ],
             if (_uid == null) ...[
               const SizedBox(height: 12),
               const Text(
@@ -198,7 +205,7 @@ class _UpgradeAccountScreenState extends State<UpgradeAccountScreen>
                 child: const Text('Masuk / Daftar'),
               ),
             ] else ...[
-              if (!premium) ...[
+              if (!premium && !PlanAccess.freeFeaturesOpen) ...[
                 const SizedBox(height: 16),
                 const Text(
                   'Nikmati riwayat dan laporan hingga 12 bulan, grafik 7 hari, serta personalisasi kartu pengeluaran.',

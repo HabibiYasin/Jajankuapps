@@ -57,10 +57,7 @@ void main() {
       await tester.tap(find.text('Mulai pakai Jajanku'));
       await tester.pumpAndSettle();
       expect(find.text('Dashboard siap'), findsNothing);
-      expect(
-        find.text('Berapa budget harian, mingguan, dan bulanan kamu?'),
-        findsOneWidget,
-      );
+      expect(find.text('Berapa budget bulanan kamu?'), findsOneWidget);
       expect(
         tester
             .widget<TextFormField>(find.byType(TextFormField).first)
@@ -125,18 +122,14 @@ void main() {
     await tester.ensureVisible(find.text('Lanjut: atur budget'));
     await tester.tap(find.text('Lanjut: atur budget'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Berapa budget harian, mingguan, dan bulanan kamu?'),
-      findsOneWidget,
-    );
+    expect(find.text('Berapa budget bulanan kamu?'), findsOneWidget);
     final inputs = tester
         .widgetList<TextFormField>(find.byType(TextFormField))
         .toList();
-    expect(inputs.map((input) => input.controller!.text), [
-      '50000',
-      '350000',
-      '1500000',
-    ]);
+    expect(inputs.map((input) => input.controller!.text), ['1500000']);
+    await tester.ensureVisible(find.text('Flexible budget'));
+    await tester.tap(find.text('Flexible budget'));
+    await tester.pump();
     await tester.ensureVisible(find.text('Mulai pakai Jajanku'));
     await tester.tap(find.text('Mulai pakai Jajanku'));
     await tester.pumpAndSettle();
@@ -148,6 +141,13 @@ void main() {
     );
     final saved = await firestore.doc('users/new-user/settings/budget').get();
     expect(saved.data()!['categories'], contains('Umum'));
+    expect(saved.data()!['mode'], 'flexible');
+    expect(data.limits.mode, BudgetMode.flexible);
+    expect(saved.data()!['monthly'], 1500000);
+    expect(
+      saved.data()!['daily'],
+      1500000 / BudgetLimits.daysInMonth(DateTime.now()),
+    );
     expect(
       (saved.data()!['categories'] as List).toSet(),
       BudgetLimits.snackCategories.toSet(),

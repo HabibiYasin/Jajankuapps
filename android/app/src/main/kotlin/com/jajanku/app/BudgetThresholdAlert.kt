@@ -10,7 +10,7 @@ object BudgetThresholdAlert {
         lastDate: String?,
         lastThreshold: Int
     ): Int? {
-        if (!total.isFinite() || total < 0 || !limit.isFinite() || limit <= 0) return null
+        if (!total.isFinite() || total < 0 || !limit.isFinite() || limit < 0) return null
         val threshold = when {
             total > limit -> 100
             total > limit * 0.75 -> 75
