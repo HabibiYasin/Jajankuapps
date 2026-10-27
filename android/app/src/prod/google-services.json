@@ -22,6 +22,22 @@
           }
         },
         {
+          "client_id": "502729548871-81jcundmmq3t9cjpdqkt93ift6b2v7c3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jajanku.app",
+            "certificate_hash": "4c9f9cb2812679ac080bd49eace5fd2a470371ce"
+          }
+        },
+        {
+          "client_id": "502729548871-p2ptvaljfc4kjt9aa8j8h8go9pkj14d6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jajanku.app",
+            "certificate_hash": "17f423e882a807afbf2e350ee55fcbcb5eac30fe"
+          }
+        },
+        {
           "client_id": "502729548871-b9i6dsg4bjbadm00jat3f6uon482b4b4.apps.googleusercontent.com",
           "client_type": 3
         }
